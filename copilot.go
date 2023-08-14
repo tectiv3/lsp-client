@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	lsp "github.com/tectiv3/go-lsp"
+	"github.com/tectiv3/go-lsp"
 	"github.com/tectiv3/go-lsp/jsonrpc"
+	"go.bug.st/json"
 	"log"
 	"os"
 	"os/exec"
@@ -21,20 +21,26 @@ func startCopilot(dir string) {
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
 	}
-	time.Sleep(2 * time.Second)
+	//time.Sleep(2 * time.Second)
 
 	lsc := lsp.NewClient(stdout, stdin, cmdHandler{})
+	lsc.SetLogger(&Logger{
+		IncomingPrefix: "IDE     LS <-- Copilot",
+		OutgoingPrefix: "IDE     LS --> Copilot",
+		HiColor:        HiRedString,
+		LoColor:        RedString,
+		ErrorColor:     ErrorString,
+	})
 	ctx := context.Background()
 	go lsc.Run()
 
 	time.Sleep(1 * time.Second)
 	conn := lsc.GetConnection()
-
 	sendRequest("initialize", KeyValue{
 		"capabilities": KeyValue{"workspace": KeyValue{"workspaceFolders": true}},
 	}, conn, ctx)
+	log.Println("After initialize")
 	lsc.Initialized(&lsp.InitializedParams{})
-	time.Sleep(1 * time.Second)
 	sendRequest("setEditorInfo", KeyValue{
 		"editorInfo":       KeyValue{"name": "Textmate", "version": "2.0.23"},
 		"editorPluginInfo": KeyValue{"name": "lsp-bridge", "version": "0.0.1"},

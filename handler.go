@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	lsp "github.com/tectiv3/go-lsp"
 	"github.com/tectiv3/go-lsp/jsonrpc"
+	"go.bug.st/json"
 	"log"
 )
 
