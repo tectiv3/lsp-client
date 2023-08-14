@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"go.bug.st/json"
-	"go.bug.st/lsp"
-	"go.bug.st/lsp/jsonrpc"
+	"encoding/json"
+	lsp "github.com/tectiv3/go-lsp"
+	"github.com/tectiv3/go-lsp/jsonrpc"
 	"log"
 	"os"
 	"os/exec"
@@ -51,8 +51,8 @@ func startIntelephense(dir string, license string) {
 	//conn.SendRequest(ctx, "initialize", []byte("{\"capabilities\": {\"workspace\": { \"workspaceFolders\": true }}}"))
 	//conn.SendRequest(ctx, "initialize", []byte("{\"capabilities\": {\"workspace\": { \"workspaceFolders\": true }}}"))
 	log.Println("After initialize", response)
-	lsc.Initialized(&lsp.InitializedParams{})
-	lsc.WorkspaceDidChangeConfiguration(&lsp.DidChangeConfigurationParams{
+	_ = lsc.Initialized(&lsp.InitializedParams{})
+	_ = lsc.WorkspaceDidChangeConfiguration(&lsp.DidChangeConfigurationParams{
 		Settings: []byte("{\"intelephense.files.maxSize\": 3000000}"),
 	})
 	lsc.RegisterCustomNotification("indexingStarted", func(logger jsonrpc.FunctionLogger, params json.RawMessage) {
