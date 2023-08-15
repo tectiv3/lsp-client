@@ -8,10 +8,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"time"
 )
 
-func startCopilot(dir string) {
+func startCopilot(in mrChan) {
 	cmd := exec.Command("/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/copilot-node-server")
 
 	stdin, _ := cmd.StdinPipe()
@@ -21,84 +20,77 @@ func startCopilot(dir string) {
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
 	}
-	//time.Sleep(2 * time.Second)
-
-	lsc := lsp.NewClient(stdout, stdin, cmdHandler{})
-	lsc.SetLogger(&Logger{
-		IncomingPrefix: "IDE     LS <-- Copilot",
-		OutgoingPrefix: "IDE     LS --> Copilot",
-		HiColor:        HiRedString,
-		LoColor:        RedString,
-		ErrorColor:     ErrorString,
+	lsc := lsp.NewClient(stdout, stdin, cmdHandler{}, func(err error) {
+		log.Println(errorString("Error: %v", err))
 	})
-	ctx := context.Background()
+	lsc.SetLogger(&Logger{
+		IncomingPrefix: "LS <-- Copilot", OutgoingPrefix: "LS --> Copilot",
+		HiColor: hiGreenString, LoColor: redString, ErrorColor: errorString,
+	})
 	go lsc.Run()
 
-	time.Sleep(1 * time.Second)
-	conn := lsc.GetConnection()
-	sendRequest("initialize", KeyValue{
-		"capabilities": KeyValue{"workspace": KeyValue{"workspaceFolders": true}},
-	}, conn, ctx)
-	log.Println("After initialize")
-	lsc.Initialized(&lsp.InitializedParams{})
-	sendRequest("setEditorInfo", KeyValue{
-		"editorInfo":       KeyValue{"name": "Textmate", "version": "2.0.23"},
-		"editorPluginInfo": KeyValue{"name": "lsp-bridge", "version": "0.0.1"},
-	}, conn, ctx)
-	time.Sleep(1 * time.Second)
-
 	lsc.RegisterCustomNotification("statusNotification", func(logger jsonrpc.FunctionLogger, params json.RawMessage) {
-		log.Println("statusNotification", string(params))
+		logger.Logf("statusNotification %s", string(params))
 	})
 
-	resp := sendRequest("signInInitiate", KeyValue{}, conn, ctx)
-	var res signInResponse
-	json.Unmarshal(resp, &res)
-	//        eval_in_emacs("browse-url", result['verificationUri'])
-	//        message_emacs(f'Please enter user-code {result["userCode"]}')
-	log.Println(res.Status)
-
-	sendRequest("getCompletions", KeyValue{
-		"doc": KeyValue{
-			"source":       "func main() {\n\t// print hello world message\n\n}",
-			"tabSize":      2,
-			"indentSize":   2,
-			"insertSpaces": false,
-			"version":      0,
-			"path":         "/tmp/test.go",
-			"uri":          "file:///tmp/test.go",
-			"relativePath": "test.go",
-			"languageId":   "go",
-			"position": KeyValue{
-				"line":      3,
-				"character": 0,
-			},
-		},
-	},
-		conn, ctx)
-
-	//resp = sendRequest("getCompletionsCycling", KeyValue{
-	//	"doc": KeyValue{
-	//		"source":       "func main() {\n\t// print hello world message\n}",
-	//		"tabSize":      2,
-	//		"indentSize":   2,
-	//		"insertSpaces": false,
-	//		"version":      0,
-	//		"path":         "/tmp/test.go",
-	//		"uri":          "file:///tmp/test.go",
-	//		"relativePath": "/tmp/test.go",
-	//		"languageId":   "go",
-	//		"position": KeyValue{
-	//			"line":      3,
-	//			"character": 3,
-	//		},
-	//	},
-	//},
-	//	conn, ctx)
-	//log.Println("getCompletionsCycling", string(resp))
+	go processRequests(in, lsc)
 
 	defer stdin.Close()
 	cmd.Wait()
+}
+
+func processRequests(in mrChan, lsc *lsp.Client) {
+	Log("Waiting for input")
+	ctx := context.Background()
+	conn := lsc.GetConnection()
+	for {
+		request := <-in
+		Log("LS <-- IDE %s %s %s", "request", request.Method, string(request.Body))
+
+		switch request.Method {
+		case "initialize":
+			sendRequest("initialize", KeyValue{
+				"capabilities": KeyValue{"workspace": KeyValue{"workspaceFolders": true}},
+			}, conn, ctx)
+			log.Println("After initialize")
+			lsc.Initialized(&lsp.InitializedParams{})
+			sendRequest("setEditorInfo", KeyValue{
+				"editorInfo":       KeyValue{"name": "Textmate", "version": "2.0.23"},
+				"editorPluginInfo": KeyValue{"name": "lsp-bridge", "version": "0.0.1"},
+			}, conn, ctx)
+			request.CB <- &KeyValue{"status": "ok"}
+		case "signIn":
+			resp := sendRequest("signInInitiate", KeyValue{}, conn, ctx)
+			var res signInResponse
+			json.Unmarshal(resp, &res)
+			//        eval_in_emacs("browse-url", result['verificationUri'])
+			//        message_emacs(f'Please enter user-code {result["userCode"]}')
+			log.Println(res.Status)
+			request.CB <- &KeyValue{"status": res.Status}
+		case "getCompletions":
+			resp := sendRequest("getCompletions", KeyValue{
+				"doc": KeyValue{
+					"source":       "func main() {\n\t// print hello world message\n\n}",
+					"tabSize":      2,
+					"indentSize":   2,
+					"insertSpaces": false,
+					"version":      0,
+					"path":         "/tmp/test.go",
+					"uri":          "file:///tmp/test.go",
+					"relativePath": "test.go",
+					"languageId":   "go",
+					"position": KeyValue{
+						"line":      3,
+						"character": 0,
+					},
+				},
+			}, conn, ctx)
+
+			request.CB <- &KeyValue{"status": "ok", "result": string(resp)}
+		case "getCompletionsCycling":
+			//
+		}
+	}
 }
 
 func sendRequest(method string, request KeyValue, conn *jsonrpc.Connection, ctx context.Context) json.RawMessage {

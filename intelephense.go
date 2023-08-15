@@ -23,7 +23,9 @@ func startIntelephense(dir string, license string) {
 	}
 	time.Sleep(2 * time.Second)
 
-	lsc := lsp.NewClient(stdout, stdin, cmdHandler{})
+	lsc := lsp.NewClient(stdout, stdin, cmdHandler{}, func(err error) {
+		Log("Error: %v", err)
+	})
 	ctx := context.Background()
 	go lsc.Run()
 

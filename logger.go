@@ -84,7 +84,7 @@ func (l *Logger) LogOutgoingResponse(id string, method string, resp json.RawMess
 	if respErr != nil {
 		e = l.ErrorColor(" ERROR: %s", respErr.AsError())
 	}
-	log.Print(l.LoColor("%s RESP %s %s%s", l.OutgoingPrefix, method, id, e))
+	log.Print(l.LoColor("%s RESP %s %s %s", l.OutgoingPrefix, method, id, e))
 }
 
 // LogIncomingNotification prints an incoming notification into the log
@@ -187,17 +187,21 @@ func c_sequence(colors ...int) string {
 
 }
 
-func HiRedString(format string, a ...interface{}) string {
+func hiRedString(format string, a ...interface{}) string {
 	return colorFormat(format, FgHiRed, a...)
 }
-func RedString(format string, a ...interface{}) string {
+func hiGreenString(format string, a ...interface{}) string {
+	return colorFormat(format, FgHiGreen, a...)
+}
+func hiMagentaString(format string, a ...interface{}) string {
+	return colorFormat(format, FgHiMagenta, a...)
+}
+func redString(format string, a ...interface{}) string {
 	return colorFormat(format, FgRed, a...)
 }
-
 func colorFormat(format string, color int, a ...interface{}) string {
 	return c_format(color) + fmt.Sprintf(format, a...) + c_unformat()
 }
-
-func ErrorString(format string, a ...interface{}) string {
+func errorString(format string, a ...interface{}) string {
 	return c_format(BgHiMagenta, FgHiWhite) + fmt.Sprintf(format, a...) + c_unformat()
 }

@@ -4,6 +4,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"sync"
+	"time"
 )
 
 type ClientInfo struct {
@@ -84,3 +86,27 @@ func (kv *KeyValue) Scan(value interface{}) error {
 
 	return json.Unmarshal(bytes, kv)
 }
+
+type mateRequest struct {
+	Method string
+	Body   json.RawMessage
+	CB     kvChan
+}
+
+type mateServer struct {
+	copilot      kvChan
+	intelephense kvChan
+	openFiles    map[string]time.Time
+	initialized  bool
+	currentWS    *workSpace
+	openFolders  []string
+	sync.Mutex
+}
+
+type workSpace struct {
+	name string
+	uri  string
+}
+
+type kvChan chan *KeyValue
+type mrChan chan *mateRequest
