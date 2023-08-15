@@ -5,23 +5,39 @@ import (
 	"github.com/tectiv3/go-lsp"
 	"github.com/tectiv3/go-lsp/jsonrpc"
 	"go.bug.st/json"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 )
 
 func startIntelephense(in mrChan) {
+	var stdin io.WriteCloser
+	var stdout, stderr io.ReadCloser
+
 	cmd := exec.Command("/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/intelephense", "--stdio")
 
-	stdin, _ := cmd.StdinPipe()
-	stdout, _ := cmd.StdoutPipe()
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+	if cin, err := cmd.StdinPipe(); err != nil {
+		panic("getting clangd stdin: " + err.Error())
+	} else if cout, err := cmd.StdoutPipe(); err != nil {
+		panic("getting clangd stdout: " + err.Error())
+	} else if cerr, err := cmd.StderrPipe(); err != nil {
+		panic("getting clangd stderr: " + err.Error())
+	} else if err := cmd.Start(); err != nil {
+		panic("running clangd: " + err.Error())
+	} else {
+		stdin = cin
+		stdout = cout
+		stderr = cerr
 	}
 
-	lsc := lsp.NewClient(stdout, stdin, cmdHandler{}, func(err error) {
+	stdio := NewReadWriteCloser(stdout, stdin)
+	stdio = LogReadWriteCloserAs(stdio, "intelephense.log")
+	go io.Copy(openLogFileAs("intelephense-err.log"), stderr)
+
+	lsc := lsp.NewClient(stdio, stdio, cmdHandler{
+		Diagnostics: make(chan *lsp.PublishDiagnosticsParams),
+	}, func(err error) {
 		log.Println(errorString("Error: %v", err))
 	})
 	lsc.SetLogger(&Logger{
@@ -44,10 +60,9 @@ func startIntelephense(in mrChan) {
 func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 	Log("Waiting for input")
 	ctx := context.Background()
-	//conn := lsc.GetConnection()
 	for {
 		request := <-in
-		Log("IS <-- IDE %s %s %s", "request", request.Method, string(request.Body))
+		Log("LS <-- IDE %s %s %s", "request", request.Method, string(request.Body))
 
 		switch request.Method {
 		case "initialize":
@@ -96,6 +111,7 @@ func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 				continue
 			}
 			response, respErr, err := lsc.TextDocumentHover(ctx, &lsp.HoverParams{TextDocumentPositionParams: params})
+			//response, respErr, err := lsc.GetConnection().SendRequest(ctx, "textDocument/hover", request.Body)
 			if respErr != nil || err != nil {
 				log.Println("respErr: ", respErr)
 				LogError(err)
@@ -104,20 +120,28 @@ func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 			}
 			request.CB <- &KeyValue{"status": "ok", "result": response}
 		case "textDocument/documentSymbol":
-			resp, respErr, err := lsc.GetConnection().SendRequest(ctx, "textDocument/documentSymbol", request.Body)
-			//resp, _, respErr, err := lsc.TextDocumentDocumentSymbol(ctx, &lsp.DocumentSymbolParams{
+			//textDocument := &KeyValue{}
+			//if err := json.Unmarshal(request.Body, textDocument); err != nil {
+			//	request.CB <- &KeyValue{"result": "error", "message": err.Error()}
+			//	return
+			//}
+			//_, _, respErr, err := lsc.TextDocumentDocumentSymbol(ctx, &lsp.DocumentSymbolParams{
 			//	TextDocument: lsp.TextDocumentIdentifier{
 			//		URI: lsp.NewDocumentURI(textDocument.string("uri", "")),
 			//	},
 			//})
-			if respErr != nil || err != nil {
-				log.Println("respErr: ", respErr)
-				LogError(err)
-				request.CB <- &KeyValue{"status": "error", "error": "documentSymbol error"}
-				continue
-			}
+			//if respErr != nil || err != nil {
+			//	log.Println("respErr: ", respErr)
+			//	LogError(err)
+			//	request.CB <- &KeyValue{"status": "error", "error": "documentSymbol error"}
+			//	continue
+			//}
+			lsc.GetConnection().SendRequest(ctx, "textDocument/documentSymbol", request.Body)
 
-			request.CB <- &KeyValue{"status": "ok", "result": resp}
+			go func() {
+				diagnostics := <-lsc.GetHandler().GetDiagnosticChannel()
+				request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
+			}()
 		case "textDocument/didOpen":
 			textDocument := &KeyValue{}
 			if err := json.Unmarshal(request.Body, textDocument); err != nil {

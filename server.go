@@ -17,7 +17,7 @@ func (s *mateServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	Log("method: %s, length: %d %s", r.Method, r.ContentLength, r.URL.Path)
+	//Log("method: %s, length: %d %s", r.Method, r.ContentLength, r.URL.Path)
 
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusNotFound)
@@ -35,7 +35,7 @@ func (s *mateServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resultChan := make(kvChan)
 	var result *KeyValue
-	tick := time.After(20 * time.Second)
+	tick := time.After(10 * time.Second)
 
 	go s.processRequest(mr, resultChan)
 
@@ -57,13 +57,19 @@ func (s *mateServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	tr, _ := json.Marshal(result)
-	Log("method: %s %s", mr.Method, string(tr))
+
+	s.logger.LogOutgoingResponse("", mr.Method, json.RawMessage(tr), nil)
 	json.NewEncoder(w).Encode(result)
 }
 
 func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 	defer s.handlePanic(mr)
 	s.logger.LogIncomingRequest("", mr.Method, mr.Body)
+
+	if mr.Method != "initialize" && !s.initialized {
+		cb <- &KeyValue{"result": "error", "message": "not initialized"}
+		return
+	}
 
 	switch mr.Method {
 	case "hover":
@@ -80,7 +86,7 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 		}
 		resp := s.sendLSPRequest(s.intelephense, "textDocument/hover", params)
 
-		cb <- &KeyValue{"result": "ok", "message": resp}
+		cb <- resp
 	case "completion":
 		params := lsp.CompletionParams{}
 		if err := json.Unmarshal(mr.Body, &params); err != nil {
@@ -108,9 +114,6 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 }
 
 func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
-	s.Lock()
-	defer s.Unlock()
-
 	params := KeyValue{}
 	if err := json.Unmarshal(mr.Body, &params); err != nil {
 		cb <- &KeyValue{"result": "error", "message": err.Error()}
@@ -123,9 +126,8 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 		return
 	}
 
-	go s.sendLSPRequest(s.intelephense, "textDocument/documentSymbol", params)
-
 	if _, ok := s.openFiles[fn]; ok {
+		//Log("file %s already opened", fn)
 		s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
 			"uri": fn,
 		})
@@ -133,16 +135,15 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 	}
 	s.openFiles[fn] = time.Now()
 
-	Log("waiting for diagnostics for %s", fn)
-	resp := s.sendLSPRequest(s.intelephense, "textDocument/didOpen", params)
+	Log("getting diagnostics for %s", fn)
+	s.sendLSPRequest(s.intelephense, "textDocument/didOpen", params)
 
-	cb <- &KeyValue{"result": "ok", "message": resp}
+	diagnostics := s.sendLSPRequest(s.intelephense, "textDocument/documentSymbol", KeyValue{"textDocument": KeyValue{"uri": fn}})
+	Log("Sending diagnostics response")
+	cb <- diagnostics
 }
 
 func (s *mateServer) onDidClose(mr mateRequest, cb kvChan) {
-	s.Lock()
-	defer s.Unlock()
-
 	params := KeyValue{}
 	if err := json.Unmarshal(mr.Body, &params); err != nil {
 		cb <- &KeyValue{"result": "error", "message": err.Error()}
@@ -162,9 +163,6 @@ func (s *mateServer) onDidClose(mr mateRequest, cb kvChan) {
 }
 
 func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
-	s.Lock()
-	defer s.Unlock()
-
 	params := KeyValue{}
 	if err := json.Unmarshal(mr.Body, &params); err != nil {
 		cb <- &KeyValue{"result": "error", "message": err.Error()}
@@ -193,6 +191,9 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 }
 
 func (s *mateServer) sendLSPRequest(out mrChan, method string, params KeyValue) *KeyValue {
+	s.Lock()
+	defer s.Unlock()
+
 	cb := make(kvChan)
 	body, _ := json.Marshal(params)
 	out <- &mateRequest{
@@ -201,11 +202,7 @@ func (s *mateServer) sendLSPRequest(out mrChan, method string, params KeyValue) 
 		CB:     cb,
 	}
 
-	if result := <-cb; result != nil {
-		return result
-	}
-
-	return nil
+	return <-cb
 }
 
 func (s *mateServer) handlePanic(mr mateRequest) {
@@ -223,6 +220,7 @@ func startServer(intelephense, copilot mrChan, port string) {
 			IncomingPrefix: "HTTP <-- IDE", OutgoingPrefix: "HTTP --> IDE",
 			HiColor: hiGreenString, LoColor: greenString, ErrorColor: errorString,
 		},
+		openFiles: make(map[string]time.Time),
 	}
 
 	log.Fatal(http.ListenAndServe(":"+port, &server))

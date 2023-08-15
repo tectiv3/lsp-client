@@ -10,7 +10,13 @@ import (
 	"runtime"
 )
 
-type cmdHandler struct{}
+type cmdHandler struct {
+	Diagnostics chan *lsp.PublishDiagnosticsParams
+}
+
+func (h cmdHandler) GetDiagnosticChannel() chan *lsp.PublishDiagnosticsParams {
+	return h.Diagnostics
+}
 
 func (h cmdHandler) ClientRegisterCapability(context.Context, jsonrpc.FunctionLogger, *lsp.RegistrationParams) *jsonrpc.ResponseError {
 	return nil
@@ -49,6 +55,11 @@ func (h cmdHandler) TelemetryEvent(logger jsonrpc.FunctionLogger, msg json.RawMe
 // TextDocumentPublishDiagnostics
 func (h cmdHandler) TextDocumentPublishDiagnostics(logger jsonrpc.FunctionLogger, params *lsp.PublishDiagnosticsParams) {
 	logger.Logf("TextDocumentPublishDiagnostics: %v", params)
+	if params.IsClear {
+		logger.Logf("Clearing diagnostics for %s", params.URI)
+		return
+	}
+	h.Diagnostics <- params
 }
 
 // WindowShowMessageRequest

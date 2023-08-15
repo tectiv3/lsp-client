@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"github.com/tectiv3/go-lsp/jsonrpc"
 	"go.bug.st/json"
+	"io"
+	"log"
+	"os"
 	"sync"
 	"time"
 )
@@ -137,4 +140,97 @@ type TextDocumentItem struct {
 
 type DidOpenTextDocumentParams struct {
 	TextDocument TextDocumentItem `json:"textDocument"`
+}
+
+// NewReadWriteCloser create an io.ReadWriteCloser from given io.ReadCloser and io.WriteCloser.
+func NewReadWriteCloser(in io.ReadCloser, out io.WriteCloser) io.ReadWriteCloser {
+	return &combinedReadWriteCloser{in, out}
+}
+
+// OpenLogFileAs creates a log file in GlobalLogDirectory.
+func openLogFileAs(filename string) *os.File {
+	path := "./logs/" + filename
+	res, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		log.Fatalf("Error opening log file: %s", err)
+	}
+	res.WriteString("\n\n\nStarted logging.\n")
+
+	return res
+}
+
+func LogReadWriteCloserAs(upstream io.ReadWriteCloser, filename string) io.ReadWriteCloser {
+	return &dumper{
+		upstream: upstream,
+		logfile:  openLogFileAs(filename),
+	}
+}
+
+type dumper struct {
+	upstream io.ReadWriteCloser
+	logfile  *os.File
+	reading  bool
+	writing  bool
+}
+
+func (d *dumper) Read(buff []byte) (int, error) {
+	n, err := d.upstream.Read(buff)
+	if err != nil {
+		d.logfile.Write([]byte(fmt.Sprintf("<<< Read Error: %s\n", err)))
+	} else {
+		if !d.reading {
+			d.reading = true
+			d.writing = false
+			d.logfile.Write([]byte("\n<<<\n"))
+		}
+		d.logfile.Write(buff[:n])
+	}
+	return n, err
+}
+
+func (d *dumper) Write(buff []byte) (int, error) {
+	n, err := d.upstream.Write(buff)
+	if err != nil {
+		_, _ = d.logfile.Write([]byte(fmt.Sprintf(">>> Write Error: %s\n", err)))
+	} else {
+		if !d.writing {
+			d.writing = true
+			d.reading = false
+			d.logfile.Write([]byte("\n>>>\n"))
+		}
+		_, _ = d.logfile.Write(buff[:n])
+	}
+	return n, err
+}
+
+func (d *dumper) Close() error {
+	err := d.upstream.Close()
+	_, _ = d.logfile.Write([]byte(fmt.Sprintf("--- Stream closed, err=%s\n", err)))
+	_ = d.logfile.Close()
+	return err
+}
+
+type combinedReadWriteCloser struct {
+	reader io.ReadCloser
+	writer io.WriteCloser
+}
+
+func (sd *combinedReadWriteCloser) Read(p []byte) (int, error) {
+	return sd.reader.Read(p)
+}
+
+func (sd *combinedReadWriteCloser) Write(p []byte) (int, error) {
+	return sd.writer.Write(p)
+}
+
+func (sd *combinedReadWriteCloser) Close() error {
+	ierr := sd.reader.Close()
+	oerr := sd.writer.Close()
+	if ierr != nil {
+		return ierr
+	}
+	if oerr != nil {
+		return oerr
+	}
+	return nil
 }
