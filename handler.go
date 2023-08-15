@@ -11,6 +11,7 @@ import (
 )
 
 type cmdHandler struct {
+	client      *lsp.Client
 	Diagnostics chan *lsp.PublishDiagnosticsParams
 }
 
@@ -19,6 +20,8 @@ func (h cmdHandler) GetDiagnosticChannel() chan *lsp.PublishDiagnosticsParams {
 }
 
 func (h cmdHandler) ClientRegisterCapability(context.Context, jsonrpc.FunctionLogger, *lsp.RegistrationParams) *jsonrpc.ResponseError {
+	//Log("ClientRegisterCapability")
+	//h.client.GetConnection().SendNotification("client/registerCapability", lsp.EncodeMessage(KeyValue{}))
 	return nil
 }
 

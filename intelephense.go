@@ -35,11 +35,14 @@ func startIntelephense(in mrChan) {
 	stdio = LogReadWriteCloserAs(stdio, "intelephense.log")
 	go io.Copy(openLogFileAs("intelephense-err.log"), stderr)
 
-	lsc := lsp.NewClient(stdio, stdio, cmdHandler{
+	handler := &cmdHandler{
 		Diagnostics: make(chan *lsp.PublishDiagnosticsParams),
-	}, func(err error) {
+	}
+	lsc := lsp.NewClient(stdio, stdio, handler, func(err error) {
 		log.Println(errorString("Error: %v", err))
 	})
+	handler.client = lsc
+
 	lsc.SetLogger(&Logger{
 		IncomingPrefix: "LS <-- Intelephense", OutgoingPrefix: "LS --> Intelephense",
 		HiColor: hiRedString, LoColor: redString, ErrorColor: errorString,
@@ -50,6 +53,7 @@ func startIntelephense(in mrChan) {
 	lsc.RegisterCustomNotification("indexingEnded", func(logger jsonrpc.FunctionLogger, params json.RawMessage) {
 		//
 	})
+
 	go lsc.Run()
 	go processIntelephenseRequests(in, lsc)
 
@@ -60,6 +64,7 @@ func startIntelephense(in mrChan) {
 func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 	Log("Waiting for input")
 	ctx := context.Background()
+
 	for {
 		request := <-in
 		Log("LS <-- IDE %s %s %s", "request", request.Method, string(request.Body))
@@ -86,9 +91,99 @@ func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 					"storagePath": storage, "clearCache": true,
 					"licenceKey": license, "isVscode": true,
 				},
-				Capabilities: lsp.ClientCapabilities{
-					WorkspaceFolders: []lsp.KeyValue{
-						{"uri": "file://" + dir, "name": name},
+				Capabilities: lsp.KeyValue{
+					"textDocument": KeyValue{
+						"synchronization": KeyValue{
+							"dynamicRegistration": true,
+							"didSave":             true,
+							"willSaveWaitUntil":   false,
+							"willSave":            true,
+						},
+						"publishDiagnostics": true,
+						"completion": KeyValue{
+							"dynamicRegistration": true,
+							"contextSupport":      true,
+							"completionItem": KeyValue{
+								"snippetSupport":          true,
+								"commitCharactersSupport": true,
+								"documentationFormat":     []string{"markdown", "plaintext"},
+								"deprecatedSupport":       true,
+								"preselectSupport":        true,
+							},
+							"completionItemKind": KeyValue{
+								"valueSet": []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25},
+							},
+						},
+						"hover": KeyValue{
+							"dynamicRegistration": true,
+							"contentFormat":       []string{"markdown", "plaintext"},
+						},
+						"signatureHelp": KeyValue{
+							"dynamicRegistration": true,
+							"signatureInformation": KeyValue{
+								"documentationFormat":  []string{"markdown", "plaintext"},
+								"parameterInformation": KeyValue{"labelOffsetSupport": true},
+							},
+						},
+						"codeLens":         KeyValue{"dynamicRegistration": true},
+						"formatting":       KeyValue{"dynamicRegistration": true},
+						"rangeFormatting":  KeyValue{"dynamicRegistration": true},
+						"onTypeFormatting": KeyValue{"dynamicRegistration": true},
+						"rename": KeyValue{
+							"dynamicRegistration": true,
+							"prepareSupport":      true,
+						},
+						"documentLink": KeyValue{"dynamicRegistration": true},
+						"typeDefinition": KeyValue{
+							"dynamicRegistration": true,
+							"linkSupport":         true,
+						},
+						"implementation": KeyValue{
+							"dynamicRegistration": true,
+							"linkSupport":         true,
+						},
+						"colorProvider": KeyValue{"dynamicRegistration": true},
+						"foldingRange": KeyValue{
+							"dynamicRegistration": true,
+							"rangeLimit":          5000,
+							"lineFoldingOnly":     true,
+						},
+						"declaration": KeyValue{
+							"dynamicRegistration": true,
+							"linkSupport":         true,
+						},
+					},
+
+					"workspace": KeyValue{
+						"applyEdit": true,
+						// "didChangeConfiguration": KeyValue{"dynamicRegistration": true},
+						// "configuration":    true,
+						"executeCommand":   KeyValue{"dynamicRegistration": true},
+						"workspaceFolders": true,
+						"symbol": KeyValue{
+							"dynamicRegistration": true,
+							"symbolKind": KeyValue{
+								"valueSet": []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25},
+							},
+						},
+						"workspaceEdit": KeyValue{
+							"documentChanges":    true,
+							"resourceOperations": []string{"create", "rename", "delete"},
+							"failureHandling":    "textOnlyTransactional",
+						},
+						"didChangeWatchedFiles": KeyValue{"dynamicRegistration": false},
+					},
+					"workspaceFolders": []KeyValue{
+						KeyValue{
+							"uri":  "file://" + dir,
+							"name": name,
+						},
+					},
+				},
+				WorkspaceFolders: &[]lsp.WorkspaceFolder{
+					{
+						URI:  lsp.NewDocumentURI(dir),
+						Name: name,
 					},
 				},
 			})
@@ -120,22 +215,6 @@ func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 			}
 			request.CB <- &KeyValue{"status": "ok", "result": response}
 		case "textDocument/documentSymbol":
-			//textDocument := &KeyValue{}
-			//if err := json.Unmarshal(request.Body, textDocument); err != nil {
-			//	request.CB <- &KeyValue{"result": "error", "message": err.Error()}
-			//	return
-			//}
-			//_, _, respErr, err := lsc.TextDocumentDocumentSymbol(ctx, &lsp.DocumentSymbolParams{
-			//	TextDocument: lsp.TextDocumentIdentifier{
-			//		URI: lsp.NewDocumentURI(textDocument.string("uri", "")),
-			//	},
-			//})
-			//if respErr != nil || err != nil {
-			//	log.Println("respErr: ", respErr)
-			//	LogError(err)
-			//	request.CB <- &KeyValue{"status": "error", "error": "documentSymbol error"}
-			//	continue
-			//}
 			lsc.GetConnection().SendRequest(ctx, "textDocument/documentSymbol", request.Body)
 
 			go func() {
@@ -148,8 +227,9 @@ func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
 				return
 			}
+			uri, _ := lsp.NewDocumentURIFromURL(textDocument.string("uri", ""))
 			go lsc.TextDocumentDidOpen(&lsp.DidOpenTextDocumentParams{TextDocument: lsp.TextDocumentItem{
-				URI:        lsp.NewDocumentURI(textDocument.string("uri", "")),
+				URI:        uri,
 				LanguageID: textDocument.string("languageId", ""),
 				Version:    textDocument.int("version", 0),
 				Text:       textDocument.string("text", ""),

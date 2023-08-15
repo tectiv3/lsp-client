@@ -138,10 +138,6 @@ type TextDocumentItem struct {
 	Text string `json:"text"`
 }
 
-type DidOpenTextDocumentParams struct {
-	TextDocument TextDocumentItem `json:"textDocument"`
-}
-
 // NewReadWriteCloser create an io.ReadWriteCloser from given io.ReadCloser and io.WriteCloser.
 func NewReadWriteCloser(in io.ReadCloser, out io.WriteCloser) io.ReadWriteCloser {
 	return &combinedReadWriteCloser{in, out}
