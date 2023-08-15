@@ -2,8 +2,9 @@ package main
 
 import (
 	"database/sql/driver"
-	"encoding/json"
 	"fmt"
+	"github.com/tectiv3/go-lsp/jsonrpc"
+	"go.bug.st/json"
 	"sync"
 	"time"
 )
@@ -94,10 +95,11 @@ type mateRequest struct {
 }
 
 type mateServer struct {
-	copilot      kvChan
-	intelephense kvChan
-	openFiles    map[string]time.Time
+	copilot      mrChan
+	intelephense mrChan
 	initialized  bool
+	logger       jsonrpc.Logger
+	openFiles    map[string]time.Time
 	currentWS    *workSpace
 	openFolders  []string
 	sync.Mutex
@@ -110,3 +112,29 @@ type workSpace struct {
 
 type kvChan chan *KeyValue
 type mrChan chan *mateRequest
+
+type DocumentURI string
+
+type TextDocumentItem struct {
+	/**
+	 * The text document's URI.
+	 */
+	URI DocumentURI `json:"uri"`
+	/**
+	 * The text document's language identifier.
+	 */
+	LanguageID string `json:"languageId"`
+	/**
+	 * The version number of this document (it will strictly increase after each
+	 * change, including undo/redo).
+	 */
+	Version int `json:"version"`
+	/**
+	 * The content of the opened text document.
+	 */
+	Text string `json:"text"`
+}
+
+type DidOpenTextDocumentParams struct {
+	TextDocument TextDocumentItem `json:"textDocument"`
+}

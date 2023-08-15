@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	lsp "github.com/tectiv3/go-lsp"
 	"github.com/tectiv3/go-lsp/jsonrpc"
 	"go.bug.st/json"
 	"log"
+	"runtime"
 )
 
 type cmdHandler struct{}
@@ -71,7 +73,136 @@ func (h cmdHandler) WorkspaceWorkspaceFolders(context.Context, jsonrpc.FunctionL
 
 // WorkspaceConfiguration
 func (h cmdHandler) WorkspaceConfiguration(context.Context, jsonrpc.FunctionLogger, *lsp.ConfigurationParams) ([]json.RawMessage, *jsonrpc.ResponseError) {
-	return nil, nil
+	cfg := KeyValue{
+		"files": KeyValue{
+			"maxSize":      300000,
+			"associations": []string{"*.php", "*.phtml"},
+			"exclude": []string{
+				"**/.git/**",
+				"**/.svn/**",
+				"**/.hg/**",
+				"**/CVS/**",
+				"**/.DS_Store/**",
+				"**/node_modules/**",
+				"**/bower_components/**",
+				"**/vendor/**/{Test,test,Tests,tests}/**",
+				"**/.git",
+				"**/.svn",
+				"**/.hg",
+				"**/CVS",
+				"**/.DS_Store",
+				"**/nova/tests/**",
+				"**/faker/**",
+				"**/*.log",
+				"**/*.log*",
+				"**/*.min.*",
+				"**/dist",
+				"**/coverage",
+				"**/build/*",
+				"**/nova/public/*",
+				"**/public/*",
+			},
+		},
+		"stubs": []string{
+			"apache",
+			"bcmath",
+			"bz2",
+			"calendar",
+			"com_dotnet",
+			"Core",
+			"ctype",
+			"curl",
+			"date",
+			"dba",
+			"dom",
+			"enchant",
+			"exif",
+			"fileinfo",
+			"filter",
+			"fpm",
+			"ftp",
+			"gd",
+			"hash",
+			"iconv",
+			"imap",
+			"interbase",
+			"intl",
+			"json",
+			"ldap",
+			"libxml",
+			"mbstring",
+			"mcrypt",
+			"meta",
+			"mssql",
+			"mysqli",
+			"oci8",
+			"odbc",
+			"openssl",
+			"pcntl",
+			"pcre",
+			"PDO",
+			"pdo_ibm",
+			"pdo_mysql",
+			"pdo_pgsql",
+			"pdo_sqlite",
+			"pgsql",
+			"Phar",
+			"posix",
+			"pspell",
+			"readline",
+			"recode",
+			"Reflection",
+			"regex",
+			"session",
+			"shmop",
+			"SimpleXML",
+			"snmp",
+			"soap",
+			"sockets",
+			"sodium",
+			"SPL",
+			"sqlite3",
+			"standard",
+			"superglobals",
+			"sybase",
+			"sysvmsg",
+			"sysvsem",
+			"sysvshm",
+			"tidy",
+			"tokenizer",
+			"wddx",
+			"xml",
+			"xmlreader",
+			"xmlrpc",
+			"xmlwriter",
+			"Zend OPcache",
+			"zip",
+			"zlib",
+		},
+		"completion": KeyValue{
+			"insertUseDeclaration":                    true,
+			"fullyQualifyGlobalConstantsAndFunctions": false,
+			"triggerParameterHints":                   true,
+			"maxItems":                                100,
+		},
+		"format": KeyValue{
+			"enable": false,
+		},
+		"environment": KeyValue{
+			"documentRoot": "",
+			"includePaths": []string{},
+		},
+		"runtime":   "",
+		"maxMemory": 0,
+		"telemetry": KeyValue{"enabled": false},
+		"trace": KeyValue{
+			"server": "verbose",
+		},
+	}
+
+	body, _ := json.Marshal(cfg)
+
+	return []json.RawMessage{body, body}, nil
 }
 
 // WorkspaceApplyEdit
@@ -81,5 +212,22 @@ func (h cmdHandler) WorkspaceApplyEdit(context.Context, jsonrpc.FunctionLogger, 
 
 // WorkspaceCodeLensRefresh
 func (h cmdHandler) WorkspaceCodeLensRefresh(context.Context, jsonrpc.FunctionLogger) *jsonrpc.ResponseError {
+	return nil
+}
+
+// Panicf takes the return value of recover() and outputs data to the log with
+// the stack trace appended. Arguments are handled in the manner of
+// fmt.Printf. Arguments should format to a string which identifies what the
+// panic code was doing. Returns a non-nil error if it recovered from a panic.
+func Panicf(r interface{}, format string, v ...interface{}) error {
+	if r != nil {
+		// Same as net/http
+		const size = 64 << 10
+		buf := make([]byte, size)
+		buf = buf[:runtime.Stack(buf, false)]
+		id := fmt.Sprintf(format, v...)
+		log.Printf("panic serving %s: %v\n%s", id, r, string(buf))
+		return fmt.Errorf("unexpected panic: %v", r)
+	}
 	return nil
 }
