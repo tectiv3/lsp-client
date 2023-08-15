@@ -92,98 +92,11 @@ func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 					"licenceKey": license, "isVscode": true,
 				},
 				Capabilities: lsp.KeyValue{
-					"textDocument": KeyValue{
-						"synchronization": KeyValue{
-							"dynamicRegistration": true,
-							"didSave":             true,
-							"willSaveWaitUntil":   false,
-							"willSave":            true,
-						},
-						"publishDiagnostics": true,
-						"completion": KeyValue{
-							"dynamicRegistration": true,
-							"contextSupport":      true,
-							"completionItem": KeyValue{
-								"snippetSupport":          true,
-								"commitCharactersSupport": true,
-								"documentationFormat":     []string{"markdown", "plaintext"},
-								"deprecatedSupport":       true,
-								"preselectSupport":        true,
-							},
-							"completionItemKind": KeyValue{
-								"valueSet": []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25},
-							},
-						},
-						"hover": KeyValue{
-							"dynamicRegistration": true,
-							"contentFormat":       []string{"markdown", "plaintext"},
-						},
-						"signatureHelp": KeyValue{
-							"dynamicRegistration": true,
-							"signatureInformation": KeyValue{
-								"documentationFormat":  []string{"markdown", "plaintext"},
-								"parameterInformation": KeyValue{"labelOffsetSupport": true},
-							},
-						},
-						"codeLens":         KeyValue{"dynamicRegistration": true},
-						"formatting":       KeyValue{"dynamicRegistration": true},
-						"rangeFormatting":  KeyValue{"dynamicRegistration": true},
-						"onTypeFormatting": KeyValue{"dynamicRegistration": true},
-						"rename": KeyValue{
-							"dynamicRegistration": true,
-							"prepareSupport":      true,
-						},
-						"documentLink": KeyValue{"dynamicRegistration": true},
-						"typeDefinition": KeyValue{
-							"dynamicRegistration": true,
-							"linkSupport":         true,
-						},
-						"implementation": KeyValue{
-							"dynamicRegistration": true,
-							"linkSupport":         true,
-						},
-						"colorProvider": KeyValue{"dynamicRegistration": true},
-						"foldingRange": KeyValue{
-							"dynamicRegistration": true,
-							"rangeLimit":          5000,
-							"lineFoldingOnly":     true,
-						},
-						"declaration": KeyValue{
-							"dynamicRegistration": true,
-							"linkSupport":         true,
-						},
-					},
-
-					"workspace": KeyValue{
-						"applyEdit": true,
-						// "didChangeConfiguration": KeyValue{"dynamicRegistration": true},
-						// "configuration":    true,
-						"executeCommand":   KeyValue{"dynamicRegistration": true},
-						"workspaceFolders": true,
-						"symbol": KeyValue{
-							"dynamicRegistration": true,
-							"symbolKind": KeyValue{
-								"valueSet": []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25},
-							},
-						},
-						"workspaceEdit": KeyValue{
-							"documentChanges":    true,
-							"resourceOperations": []string{"create", "rename", "delete"},
-							"failureHandling":    "textOnlyTransactional",
-						},
-						"didChangeWatchedFiles": KeyValue{"dynamicRegistration": false},
-					},
 					"workspaceFolders": []KeyValue{
 						KeyValue{
 							"uri":  "file://" + dir,
 							"name": name,
 						},
-					},
-				},
-				WorkspaceFolders: &[]lsp.WorkspaceFolder{
-					{
-						URI:  lsp.NewDocumentURI(dir),
-						Name: name,
 					},
 				},
 			})
@@ -214,8 +127,19 @@ func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 				continue
 			}
 			request.CB <- &KeyValue{"status": "ok", "result": response}
+		case "textDocument/definition":
+			fallthrough
+		case "textDocument/completion":
+			response, respErr, err := lsc.GetConnection().SendRequest(ctx, request.Method, request.Body)
+			if respErr != nil || err != nil {
+				log.Println("respErr: ", respErr)
+				LogError(err)
+				request.CB <- &KeyValue{"status": "error", "error": "hover error"}
+				continue
+			}
+			request.CB <- &KeyValue{"status": "ok", "result": response}
 		case "textDocument/documentSymbol":
-			lsc.GetConnection().SendRequest(ctx, "textDocument/documentSymbol", request.Body)
+			lsc.GetConnection().SendRequest(ctx, request.Method, request.Body)
 
 			go func() {
 				diagnostics := <-lsc.GetHandler().GetDiagnosticChannel()

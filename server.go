@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/tectiv3/go-lsp"
 	"go.bug.st/json"
 	"log"
 	"net/http"
@@ -88,19 +87,36 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 
 		cb <- resp
 	case "completion":
-		params := lsp.CompletionParams{}
-		if err := json.Unmarshal(mr.Body, &params); err != nil {
-			cb <- &KeyValue{"result": "error", "message": err.Error()}
-			return
-		}
+		//params := lsp.CompletionParams{}
+		//if err := json.Unmarshal(mr.Body, &params); err != nil {
+		//	cb <- &KeyValue{"result": "error", "message": err.Error()}
+		//	return
+		//}
 		//s.requestAndWait("textDocument/completion", params, cb)
-	case "definition":
-		params := lsp.TextDocumentPositionParams{}
+		params := KeyValue{}
 		if err := json.Unmarshal(mr.Body, &params); err != nil {
 			cb <- &KeyValue{"result": "error", "message": err.Error()}
 			return
 		}
+		result := s.sendLSPRequest(s.intelephense, "textDocument/completion", params)
+		Log("Sending completion response")
+		cb <- result
+	case "definition":
+		//params := lsp.TextDocumentPositionParams{}
+		//if err := json.Unmarshal(mr.Body, &params); err != nil {
+		//	cb <- &KeyValue{"result": "error", "message": err.Error()}
+		//	return
+		//}
 		//s.requestAndWait("textDocument/definition", params, cb)
+		params := KeyValue{}
+		if err := json.Unmarshal(mr.Body, &params); err != nil {
+			cb <- &KeyValue{"result": "error", "message": err.Error()}
+			return
+		}
+		result := s.sendLSPRequest(s.intelephense, "textDocument/definition", params)
+		Log("Sending definition response")
+		cb <- result
+
 	case "initialize":
 		s.onInitialize(mr, cb)
 	case "didOpen":
@@ -119,7 +135,7 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 		cb <- &KeyValue{"result": "error", "message": err.Error()}
 		return
 	}
-	//.URI.AsPath().String()
+
 	fn := params.string("uri", "")
 	if len(fn) == 0 {
 		cb <- &KeyValue{"result": "error", "message": "Invalid document uri"}
