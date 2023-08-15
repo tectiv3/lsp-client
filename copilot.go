@@ -21,11 +21,11 @@ func startCopilot(in mrChan) {
 		log.Fatal(err)
 	}
 	lsc := lsp.NewClient(stdout, stdin, cmdHandler{}, func(err error) {
-		log.Println(errorString("Error: %v", err))
+		LogError(err)
 	})
 	lsc.SetLogger(&Logger{
 		IncomingPrefix: "LS <-- Copilot", OutgoingPrefix: "LS --> Copilot",
-		HiColor: hiGreenString, LoColor: redString, ErrorColor: errorString,
+		HiColor: hiGreenString, LoColor: greenString, ErrorColor: errorString,
 	})
 	go lsc.Run()
 
@@ -33,13 +33,13 @@ func startCopilot(in mrChan) {
 		logger.Logf("statusNotification %s", string(params))
 	})
 
-	go processRequests(in, lsc)
+	go processCopilotRequests(in, lsc)
 
 	defer stdin.Close()
 	cmd.Wait()
 }
 
-func processRequests(in mrChan, lsc *lsp.Client) {
+func processCopilotRequests(in mrChan, lsc *lsp.Client) {
 	Log("Waiting for input")
 	ctx := context.Background()
 	conn := lsc.GetConnection()
@@ -65,7 +65,7 @@ func processRequests(in mrChan, lsc *lsp.Client) {
 			json.Unmarshal(resp, &res)
 			//        eval_in_emacs("browse-url", result['verificationUri'])
 			//        message_emacs(f'Please enter user-code {result["userCode"]}')
-			log.Println(res.Status)
+			//log.Println(res.Status)
 			request.CB <- &KeyValue{"status": res.Status}
 		case "getCompletions":
 			resp := sendRequest("getCompletions", KeyValue{

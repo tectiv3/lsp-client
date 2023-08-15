@@ -55,7 +55,7 @@ func (l *Logger) LogIncomingResponse(id string, method string, resp json.RawMess
 	} else {
 		e = string(resp)
 	}
-	log.Print(l.LoColor("%s RESP %s %s%s", l.IncomingPrefix, method, id, e))
+	log.Print(l.LoColor("%s RESP %s %s %s", l.IncomingPrefix, method, id, e))
 }
 
 // LogOutgoingNotification prints an outgoing notification into the log
@@ -198,6 +198,9 @@ func hiMagentaString(format string, a ...interface{}) string {
 }
 func redString(format string, a ...interface{}) string {
 	return colorFormat(format, FgRed, a...)
+}
+func greenString(format string, a ...interface{}) string {
+	return colorFormat(format, FgGreen, a...)
 }
 func colorFormat(format string, color int, a ...interface{}) string {
 	return c_format(color) + fmt.Sprintf(format, a...) + c_unformat()
