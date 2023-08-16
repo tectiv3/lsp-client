@@ -5,60 +5,22 @@ import (
 	"github.com/tectiv3/go-lsp"
 	"github.com/tectiv3/go-lsp/jsonrpc"
 	"go.bug.st/json"
-	"io"
 	"log"
 	"os"
-	"os/exec"
 )
 
 func startIntelephense(in mrChan) {
-	var stdin io.WriteCloser
-	var stdout, stderr io.ReadCloser
-
-	cmd := exec.Command("/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/intelephense", "--stdio")
-
-	if cin, err := cmd.StdinPipe(); err != nil {
-		panic("getting clangd stdin: " + err.Error())
-	} else if cout, err := cmd.StdoutPipe(); err != nil {
-		panic("getting clangd stdout: " + err.Error())
-	} else if cerr, err := cmd.StderrPipe(); err != nil {
-		panic("getting clangd stderr: " + err.Error())
-	} else if err := cmd.Start(); err != nil {
-		panic("running clangd: " + err.Error())
-	} else {
-		stdin = cin
-		stdout = cout
-		stderr = cerr
-	}
-
-	stdio := NewReadWriteCloser(stdout, stdin)
-	stdio = LogReadWriteCloserAs(stdio, "intelephense.log")
-	go io.Copy(openLogFileAs("intelephense-err.log"), stderr)
-
-	handler := &cmdHandler{
-		Diagnostics: make(chan *lsp.PublishDiagnosticsParams),
-	}
-	lsc := lsp.NewClient(stdio, stdio, handler, func(err error) {
-		log.Println(errorString("Error: %v", err))
-	})
-	handler.client = lsc
+	lsc := startRPCServer("intelephense", "/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/intelephense", "--stdio")
 
 	lsc.SetLogger(&Logger{
 		IncomingPrefix: "LS <-- Intelephense", OutgoingPrefix: "LS --> Intelephense",
 		HiColor: hiRedString, LoColor: redString, ErrorColor: errorString,
 	})
-	lsc.RegisterCustomNotification("indexingStarted", func(logger jsonrpc.FunctionLogger, params json.RawMessage) {
-		//
-	})
-	lsc.RegisterCustomNotification("indexingEnded", func(logger jsonrpc.FunctionLogger, params json.RawMessage) {
-		//
-	})
+	lsc.RegisterCustomNotification("indexingStarted", func(jsonrpc.FunctionLogger, json.RawMessage) {})
+	lsc.RegisterCustomNotification("indexingEnded", func(jsonrpc.FunctionLogger, json.RawMessage) {})
 
 	go lsc.Run()
 	go processIntelephenseRequests(in, lsc)
-
-	defer stdin.Close()
-	cmd.Wait()
 }
 
 func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {

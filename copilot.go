@@ -6,37 +6,22 @@ import (
 	"github.com/tectiv3/go-lsp/jsonrpc"
 	"go.bug.st/json"
 	"log"
-	"os"
-	"os/exec"
+	"path/filepath"
 )
 
 func startCopilot(in mrChan) {
-	cmd := exec.Command("/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/copilot-node-server")
+	lsc := startRPCServer("copilot", "/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/copilot-node-server")
 
-	stdin, _ := cmd.StdinPipe()
-	stdout, _ := cmd.StdoutPipe()
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
-	}
-	lsc := lsp.NewClient(stdout, stdin, cmdHandler{}, func(err error) {
-		LogError(err)
-	})
 	lsc.SetLogger(&Logger{
 		IncomingPrefix: "LS <-- Copilot", OutgoingPrefix: "LS --> Copilot",
 		HiColor: hiGreenString, LoColor: greenString, ErrorColor: errorString,
 	})
-	go lsc.Run()
-
 	lsc.RegisterCustomNotification("statusNotification", func(logger jsonrpc.FunctionLogger, params json.RawMessage) {
 		logger.Logf("statusNotification %s", string(params))
 	})
 
+	go lsc.Run()
 	go processCopilotRequests(in, lsc)
-
-	defer stdin.Close()
-	cmd.Wait()
 }
 
 func processCopilotRequests(in mrChan, lsc *lsp.Client) {
@@ -68,27 +53,57 @@ func processCopilotRequests(in mrChan, lsc *lsp.Client) {
 			//log.Println(res.Status)
 			request.CB <- &KeyValue{"status": res.Status}
 		case "getCompletions":
-			resp := sendRequest("getCompletions", KeyValue{
-				"doc": KeyValue{
-					"source":       "func main() {\n\t// print hello world message\n\n}",
-					"tabSize":      2,
-					"indentSize":   2,
-					"insertSpaces": false,
-					"version":      0,
-					"path":         "/tmp/test.go",
-					"uri":          "file:///tmp/test.go",
-					"relativePath": "test.go",
-					"languageId":   "go",
-					"position": KeyValue{
-						"line":      3,
-						"character": 0,
+			go func() {
+				textDocument := &KeyValue{}
+				if err := json.Unmarshal(request.Body, textDocument); err != nil {
+					request.CB <- &KeyValue{"result": "error", "message": err.Error()}
+					return
+				}
+				path := textDocument.string("uri", "")
+				position := textDocument.keyValue("position", KeyValue{})
+				resp := sendRequest("getCompletions", KeyValue{
+					"doc": KeyValue{
+						"source":       textDocument.string("text", ""),
+						"tabSize":      4,
+						"indentSize":   4,
+						"insertSpaces": true,
+						"version":      0,
+						"path":         path,
+						"uri":          "file://" + path,
+						"relativePath": filepath.Base(path),
+						"languageId":   "php",
+						"position":     position,
 					},
-				},
-			}, conn, ctx)
-
-			request.CB <- &KeyValue{"status": "ok", "result": string(resp)}
+				}, conn, ctx)
+				if string(resp) == "null" {
+					Log("Empty response")
+					request.CB <- &KeyValue{"status": "ok", "result": "No completions"}
+					return
+				}
+				result := CompletionsResponse{}
+				if err := json.Unmarshal(resp, &result); err != nil {
+					request.CB <- &KeyValue{"result": "error", "message": err.Error()}
+					return
+				}
+				// check that slice of completions is not empty
+				if len(result.Completions) == 0 {
+					request.CB <- &KeyValue{"status": "ok", "result": "No completions"}
+					return
+				}
+				completion := result.Completions[0]
+				conn.SendNotification("notifyShown", lsp.EncodeMessage(KeyValue{
+					"uuids": []string{completion.UUID},
+				}))
+				request.CB <- &KeyValue{"status": "ok", "result": lsp.EncodeMessage(completion.DisplayText)}
+			}()
 		case "getCompletionsCycling":
-			//
+		//
+		case "notifyCompletionAccepted":
+		//h.client.GetConnection().SendNotification("notifyAccepted", lsp.EncodeMessage(KeyValue{}))
+		case "notifyCompletionRejected":
+		//h.client.GetConnection().SendNotification("notifyRejected", lsp.EncodeMessage(KeyValue{}))
+		case "notifyShown":
+			//h.client.GetConnection().SendNotification("notifyShown", lsp.EncodeMessage(KeyValue{}))
 		}
 	}
 }
@@ -96,20 +111,16 @@ func processCopilotRequests(in mrChan, lsc *lsp.Client) {
 func sendRequest(method string, request KeyValue, conn *jsonrpc.Connection, ctx context.Context) json.RawMessage {
 	body, err := json.Marshal(request)
 	if err != nil {
-		log.Println(err)
+		LogError(err)
 		return []byte{}
 	}
 
 	resp, respErr, err := conn.SendRequest(ctx, method, body)
 	if err != nil || respErr != nil {
-		log.Println(respErr, err)
-		return []byte{}
-	}
-	if string(resp) == "null" {
-		log.Println("Empty response")
+		log.Println("respErr: ", respErr)
+		LogError(err)
 		return []byte{}
 	}
 
-	log.Println(method, string(resp))
 	return resp
 }

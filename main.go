@@ -9,7 +9,7 @@ var logger = NewLSPFunctionLogger(hiMagentaString, "App")
 
 func main() {
 	copilotChan := make(mrChan, 2)
-	//go startCopilot(copilotChan)
+	go startCopilot(copilotChan)
 	intelephenseChan := make(mrChan, 2)
 	go startIntelephense(intelephenseChan)
 	go startServer(intelephenseChan, copilotChan, "8787")

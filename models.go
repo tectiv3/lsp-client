@@ -28,6 +28,31 @@ type signInResponse struct {
 	UserCode        string `json:"userCode,omitempty"`
 }
 
+type Completion struct {
+	UUID  string `json:"uuid"`
+	Text  string `json:"text"`
+	Range struct {
+		Start struct {
+			Line      int `json:"line"`
+			Character int `json:"character"`
+		} `json:"start"`
+		End struct {
+			Line      int `json:"line"`
+			Character int `json:"character"`
+		} `json:"end"`
+	} `json:"range"`
+	DisplayText string `json:"displayText"`
+	Position    struct {
+		Line      int `json:"line"`
+		Character int `json:"character"`
+	} `json:"position"`
+	DocVersion int `json:"docVersion"`
+}
+
+type CompletionsResponse struct {
+	Completions []Completion `json:"completions"`
+}
+
 // KeyValue is basic key:value struct
 type KeyValue map[string]interface{}
 
@@ -69,6 +94,18 @@ func (kv KeyValue) string(name string, defaultValue string) string {
 func (kv KeyValue) float64(name string, defaultValue float64) float64 {
 	if v, found := kv[name]; found {
 		if castValue, is := v.(float64); is {
+			return castValue
+		}
+	}
+	return defaultValue
+}
+
+func (kv KeyValue) keyValue(name string, defaultValue KeyValue) KeyValue {
+	if v, found := kv[name]; found {
+		if castValue, is := v.(KeyValue); is {
+			return castValue
+		}
+		if castValue, is := v.(map[string]interface{}); is {
 			return castValue
 		}
 	}

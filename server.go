@@ -43,7 +43,8 @@ func (s *mateServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case <-tick:
 		w.WriteHeader(http.StatusGatewayTimeout)
 		w.Header().Set("Content-Type", "application/json")
-		Log("method: %s Time out", mr.Method)
+
+		s.logger.LogOutgoingResponse("", mr.Method, json.RawMessage(`{"result": "error", "message": "time out"}`), nil)
 		json.NewEncoder(w).Encode(KeyValue{"result": "error", "message": "time out"})
 		return
 	case result = <-resultChan:
@@ -123,6 +124,15 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 		s.onDidOpen(mr, cb)
 	case "didClose":
 		s.onDidClose(mr, cb)
+	case "getCompletions":
+		params := KeyValue{}
+		if err := json.Unmarshal(mr.Body, &params); err != nil {
+			cb <- &KeyValue{"result": "error", "message": err.Error()}
+			return
+		}
+		result := s.sendLSPRequest(s.copilot, "getCompletions", params)
+		Log("Sending copilot completions")
+		cb <- result
 	default:
 		cb <- &KeyValue{"result": "error", "message": "unknown method"}
 	}
@@ -185,24 +195,29 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 		return
 	}
 
-	if s.initialized {
-		cb <- &KeyValue{"result": "ok", "message": "already initialized"}
-		return
-	}
-
-	s.sendLSPRequest(s.copilot, "initialize", KeyValue{})
-	s.sendLSPRequest(s.copilot, "signIn", KeyValue{})
-
 	dir := params.string("dir", "")
 	if len(dir) == 0 {
 		cb <- &KeyValue{"result": "error", "message": "Empty dir"}
 		return
 
 	}
+
+	if s.initialized {
+		cb <- &KeyValue{"result": "ok", "message": "already initialized"}
+		return
+	}
+
+	// initialize copilot
+	go func() {
+		s.sendLSPRequest(s.copilot, "initialize", KeyValue{})
+		s.sendLSPRequest(s.copilot, "signIn", KeyValue{})
+	}()
+
+	// initialize intelephense
 	s.sendLSPRequest(s.intelephense, "initialize", params)
 
 	s.initialized = true
-	s.currentWS = &workSpace{"event", ""}
+	//s.currentWS = &workSpace{"event", ""}
 	cb <- &KeyValue{"result": "ok"}
 }
 
