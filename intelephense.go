@@ -9,27 +9,30 @@ import (
 	"os"
 )
 
-func startIntelephense(in mrChan) {
-	lsc := startRPCServer("intelephense", "/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/intelephense", "--stdio")
+var iClient *cmdHandler
 
-	lsc.SetLogger(&Logger{
-		IncomingPrefix: "LS <-- Intelephense", OutgoingPrefix: "LS --> Intelephense",
+func startIntelephense(in mrChan) {
+	iClient = startRPCServer("intelephense", "/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/intelephense", "--stdio")
+
+	iClient.lsc.SetLogger(&Logger{
+		IncomingPrefix: "LSI <-- Intelephense", OutgoingPrefix: "LSI --> Intelephense",
 		HiColor: hiRedString, LoColor: redString, ErrorColor: errorString,
 	})
-	lsc.RegisterCustomNotification("indexingStarted", func(jsonrpc.FunctionLogger, json.RawMessage) {})
-	lsc.RegisterCustomNotification("indexingEnded", func(jsonrpc.FunctionLogger, json.RawMessage) {})
+	iClient.lsc.RegisterCustomNotification("indexingStarted", func(jsonrpc.FunctionLogger, json.RawMessage) {})
+	iClient.lsc.RegisterCustomNotification("indexingEnded", func(jsonrpc.FunctionLogger, json.RawMessage) {})
 
-	go lsc.Run()
-	go processIntelephenseRequests(in, lsc)
+	go iClient.lsc.Run()
+	go iClient.processIntelephenseRequests(in)
 }
 
-func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
+func (c *cmdHandler) processIntelephenseRequests(in mrChan) {
 	Log("Waiting for input")
 	ctx := context.Background()
+	lsc := c.lsc
 
 	for {
 		request := <-in
-		Log("LS <-- IDE %s %s %s", "request", request.Method, string(request.Body))
+		Log("LSI <-- IDE %s %s %s", "request", request.Method, string(request.Body))
 
 		switch request.Method {
 		case "initialize":
@@ -44,23 +47,44 @@ func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 			license := params.string("license", "")
 			name := params.string("name", "phpProject")
 			storage := params.string("storage", "/tmp/intelephense/")
+			var folders []lsp.WorkspaceFolder
+			paramFolders := params.array("folders", []interface{}{})
+			if len(paramFolders) > 0 {
+				Log("folders: %d, %v", len(paramFolders), paramFolders)
+				for _, f := range paramFolders {
+					if m, ok := f.(map[string]interface{}); ok {
+						folder := KeyValue(m)
+						uri, _ := lsp.NewDocumentURIFromURL(folder.string("uri", ""))
+						folders = append(folders, lsp.WorkspaceFolder{
+							URI:  uri,
+							Name: folder.string("name", ""),
+						})
+					} else {
+						panic("whaaaat")
+					}
+
+				}
+			} else {
+				folders = append(folders, lsp.WorkspaceFolder{
+					URI:  lsp.NewDocumentURI(dir),
+					Name: name,
+				})
+
+			}
 
 			_, respErr, err := lsc.Initialize(ctx, &lsp.InitializeParams{
 				ProcessID: &pid,
-				RootURI:   lsp.NewDocumentURI(dir),
-				RootPath:  dir,
+				//RootURI:   lsp.NewDocumentURI(dir),
+				//RootPath:  dir,
 				InitializationOptions: lsp.KeyValue{
 					"storagePath": storage, "clearCache": true,
 					"licenceKey": license, "isVscode": true,
 				},
 				Capabilities: lsp.KeyValue{
-					"workspaceFolders": []KeyValue{
-						KeyValue{
-							"uri":  "file://" + dir,
-							"name": name,
-						},
-					},
+					"workspace":        KeyValue{"workspaceFolders": true},
+					"workspaceFolders": folders,
 				},
+				WorkspaceFolders: &folders,
 			})
 			if respErr != nil || err != nil {
 				log.Println("respErr: ", respErr)
@@ -71,7 +95,9 @@ func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 
 			go lsc.Initialized(&lsp.InitializedParams{})
 			go lsc.WorkspaceDidChangeConfiguration(&lsp.DidChangeConfigurationParams{
-				Settings: []byte("{\"intelephense.files.maxSize\": 3000000}"),
+				Settings: lsp.KeyValue{
+					"intelephense": KeyValue{"files": KeyValue{"maxSize": 3000000}},
+				},
 			})
 			request.CB <- &KeyValue{"status": "ok"}
 		case "textDocument/hover":
@@ -89,6 +115,29 @@ func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 				continue
 			}
 			request.CB <- &KeyValue{"status": "ok", "result": response}
+		case "didChangeWorkspaceFolders":
+			folder := lsp.WorkspaceFolder{}
+			if err := json.Unmarshal(request.Body, &folder); err != nil {
+				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
+				continue
+			}
+			lsc.WorkspaceDidChangeWorkspaceFolders(&lsp.DidChangeWorkspaceFoldersParams{
+				Event: lsp.WorkspaceFoldersChangeEvent{
+					Added:   []lsp.WorkspaceFolder{folder},
+					Removed: []lsp.WorkspaceFolder{},
+				},
+			})
+			//lsc.GetConnection().SendNotification("workspace/didChangeWorkspaceFolders", lsp.EncodeMessage(KeyValue{
+			//	"event": KeyValue{
+			//		"added": []KeyValue{
+			//			KeyValue{
+			//				"uri":  folder.URI,
+			//				"name": folder.Name,
+			//			},
+			//		},
+			//		"removed": []KeyValue{},
+			//	},
+			//}))
 		case "textDocument/definition":
 			fallthrough
 		case "textDocument/completion":
@@ -104,7 +153,15 @@ func processIntelephenseRequests(in mrChan, lsc *lsp.Client) {
 			lsc.GetConnection().SendRequest(ctx, request.Method, request.Body)
 
 			go func() {
+				Log("Waiting for diagnostics")
+				c.Lock()
+				c.waitingForDiagnostics = true
+				c.Unlock()
+
 				diagnostics := <-lsc.GetHandler().GetDiagnosticChannel()
+				c.Lock()
+				c.waitingForDiagnostics = false
+				c.Unlock()
 				request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
 			}()
 		case "textDocument/didOpen":

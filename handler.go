@@ -10,11 +10,14 @@ import (
 	"log"
 	"os/exec"
 	"runtime"
+	"sync"
 )
 
 type cmdHandler struct {
-	client      *lsp.Client
-	Diagnostics chan *lsp.PublishDiagnosticsParams
+	lsc                   *lsp.Client
+	Diagnostics           chan *lsp.PublishDiagnosticsParams
+	waitingForDiagnostics bool
+	sync.Mutex
 }
 
 func (h cmdHandler) GetDiagnosticChannel() chan *lsp.PublishDiagnosticsParams {
@@ -59,12 +62,19 @@ func (h cmdHandler) TelemetryEvent(logger jsonrpc.FunctionLogger, msg json.RawMe
 
 // TextDocumentPublishDiagnostics
 func (h cmdHandler) TextDocumentPublishDiagnostics(logger jsonrpc.FunctionLogger, params *lsp.PublishDiagnosticsParams) {
-	logger.Logf("TextDocumentPublishDiagnostics: %v", params)
-	if params.IsClear {
-		logger.Logf("Clearing diagnostics for %s", params.URI)
-		return
-	}
-	h.Diagnostics <- params
+	go func() {
+		h.Lock()
+		defer h.Unlock()
+		if !h.waitingForDiagnostics {
+			return
+		}
+		logger.Logf("TextDocumentPublishDiagnostics: %v", params)
+		if params.IsClear {
+			logger.Logf("Clearing diagnostics for %s", params.URI)
+			return
+		}
+		h.Diagnostics <- params
+	}()
 }
 
 // WindowShowMessageRequest
@@ -84,7 +94,16 @@ func (h cmdHandler) WindowWorkDoneProgressCreate(context.Context, jsonrpc.Functi
 
 // WorkspaceWorkspaceFolders
 func (h cmdHandler) WorkspaceWorkspaceFolders(context.Context, jsonrpc.FunctionLogger) ([]lsp.WorkspaceFolder, *jsonrpc.ResponseError) {
-	return nil, nil
+	folders := []lsp.WorkspaceFolder{}
+	// go over server openFolders and append to folders
+	for name, folder := range server.openFolders {
+		folders = append(folders, lsp.WorkspaceFolder{
+			URI:  folder,
+			Name: name,
+		})
+	}
+
+	return folders, nil
 }
 
 // WorkspaceConfiguration
@@ -248,7 +267,7 @@ func Panicf(r interface{}, format string, v ...interface{}) error {
 	return nil
 }
 
-func startRPCServer(app, name string, args ...string) *lsp.Client {
+func startRPCServer(app, name string, args ...string) *cmdHandler {
 	var stdin io.WriteCloser
 	var stdout, stderr io.ReadCloser
 
@@ -278,12 +297,12 @@ func startRPCServer(app, name string, args ...string) *lsp.Client {
 	lsc := lsp.NewClient(stdio, stdio, handler, func(err error) {
 		log.Println(errorString("Error: %v", err))
 	})
-	handler.client = lsc
+	handler.lsc = lsc
 
 	go func() {
 		defer stdin.Close()
 		cmd.Wait()
 	}()
 
-	return lsc
+	return handler
 }

@@ -9,28 +9,31 @@ import (
 	"path/filepath"
 )
 
-func startCopilot(in mrChan) {
-	lsc := startRPCServer("copilot", "/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/copilot-node-server")
+var cClient *cmdHandler
 
-	lsc.SetLogger(&Logger{
-		IncomingPrefix: "LS <-- Copilot", OutgoingPrefix: "LS --> Copilot",
+func startCopilot(in mrChan) {
+	cClient = startRPCServer("copilot", "/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/copilot-node-server", "--stdio")
+
+	cClient.lsc.SetLogger(&Logger{
+		IncomingPrefix: "LSC <-- Copilot", OutgoingPrefix: "LSC --> Copilot",
 		HiColor: hiGreenString, LoColor: greenString, ErrorColor: errorString,
 	})
-	lsc.RegisterCustomNotification("statusNotification", func(logger jsonrpc.FunctionLogger, params json.RawMessage) {
+	cClient.lsc.RegisterCustomNotification("statusNotification", func(logger jsonrpc.FunctionLogger, params json.RawMessage) {
 		logger.Logf("statusNotification %s", string(params))
 	})
 
-	go lsc.Run()
-	go processCopilotRequests(in, lsc)
+	go cClient.lsc.Run()
+	go cClient.processCopilotRequests(in)
 }
 
-func processCopilotRequests(in mrChan, lsc *lsp.Client) {
+func (c *cmdHandler) processCopilotRequests(in mrChan) {
 	Log("Waiting for input")
 	ctx := context.Background()
+	lsc := c.lsc
 	conn := lsc.GetConnection()
 	for {
 		request := <-in
-		Log("LS <-- IDE %s %s %s", "request", request.Method, string(request.Body))
+		Log("LSC <-- IDE %s %s %s", "request", request.Method, string(request.Body))
 
 		switch request.Method {
 		case "initialize":
@@ -102,8 +105,20 @@ func processCopilotRequests(in mrChan, lsc *lsp.Client) {
 		//h.client.GetConnection().SendNotification("notifyAccepted", lsp.EncodeMessage(KeyValue{}))
 		case "notifyCompletionRejected":
 		//h.client.GetConnection().SendNotification("notifyRejected", lsp.EncodeMessage(KeyValue{}))
-		case "notifyShown":
-			//h.client.GetConnection().SendNotification("notifyShown", lsp.EncodeMessage(KeyValue{}))
+		case "textDocument/didOpen":
+			textDocument := &KeyValue{}
+			if err := json.Unmarshal(request.Body, textDocument); err != nil {
+				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
+				return
+			}
+			uri, _ := lsp.NewDocumentURIFromURL(textDocument.string("uri", ""))
+			go lsc.TextDocumentDidOpen(&lsp.DidOpenTextDocumentParams{TextDocument: lsp.TextDocumentItem{
+				URI:        uri,
+				LanguageID: textDocument.string("languageId", ""),
+				Version:    textDocument.int("version", 0),
+				Text:       textDocument.string("text", ""),
+			}})
+			request.CB <- &KeyValue{"status": "ok"}
 		}
 	}
 }

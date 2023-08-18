@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql/driver"
 	"fmt"
+	"github.com/tectiv3/go-lsp"
 	"github.com/tectiv3/go-lsp/jsonrpc"
 	"go.bug.st/json"
 	"io"
@@ -112,6 +113,15 @@ func (kv KeyValue) keyValue(name string, defaultValue KeyValue) KeyValue {
 	return defaultValue
 }
 
+func (kv KeyValue) array(name string, defaultValue []interface{}) []interface{} {
+	if v, found := kv[name]; found {
+		if castValue, is := v.([]interface{}); is {
+			return castValue
+		}
+	}
+	return defaultValue
+}
+
 // Value get value of KeyValue
 func (kv KeyValue) Value() (driver.Value, error) {
 	return json.Marshal(kv)
@@ -141,7 +151,7 @@ type mateServer struct {
 	logger       jsonrpc.Logger
 	openFiles    map[string]time.Time
 	currentWS    *workSpace
-	openFolders  []string
+	openFolders  map[string]lsp.DocumentURI
 	sync.Mutex
 }
 

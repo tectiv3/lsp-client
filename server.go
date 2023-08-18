@@ -1,12 +1,15 @@
 package main
 
 import (
+	"github.com/tectiv3/go-lsp"
 	"go.bug.st/json"
 	"log"
 	"net/http"
 	"runtime/debug"
 	"time"
 )
+
+var server mateServer
 
 func (s *mateServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
@@ -140,6 +143,13 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 }
 
 func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
+	s.Lock()
+	defer s.Unlock()
+	if !s.initialized {
+		cb <- &KeyValue{"result": "error", "message": "not initialized"}
+		return
+	}
+
 	params := KeyValue{}
 	if err := json.Unmarshal(mr.Body, &params); err != nil {
 		cb <- &KeyValue{"result": "error", "message": err.Error()}
@@ -154,15 +164,29 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 
 	if _, ok := s.openFiles[fn]; ok {
 		//Log("file %s already opened", fn)
-		s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
-			"uri": fn,
-		})
-		time.Sleep(100 * time.Millisecond)
+		//s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
+		//	"uri": fn,
+		//})
+		//time.Sleep(100 * time.Millisecond)
 	}
 	s.openFiles[fn] = time.Now()
+	// sort slice and remove items if there are over 20 of them
+	if len(s.openFiles) > 19 {
+		//Log("openFiles: %v", s.openFiles)
+		for k, v := range s.openFiles {
+			if time.Since(v).Seconds() > 60 {
+				Log("Removing %s from openFiles", k)
+				delete(s.openFiles, k)
+				s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
+					"uri": k,
+				})
+			}
+		}
+	}
 
 	Log("getting diagnostics for %s", fn)
 	s.sendLSPRequest(s.intelephense, "textDocument/didOpen", params)
+	go s.sendLSPRequest(s.copilot, "textDocument/didOpen", params)
 
 	diagnostics := s.sendLSPRequest(s.intelephense, "textDocument/documentSymbol", KeyValue{"textDocument": KeyValue{"uri": fn}})
 	Log("Sending diagnostics response")
@@ -170,6 +194,8 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 }
 
 func (s *mateServer) onDidClose(mr mateRequest, cb kvChan) {
+	s.Lock()
+	defer s.Unlock()
 	params := KeyValue{}
 	if err := json.Unmarshal(mr.Body, &params); err != nil {
 		cb <- &KeyValue{"result": "error", "message": err.Error()}
@@ -189,42 +215,58 @@ func (s *mateServer) onDidClose(mr mateRequest, cb kvChan) {
 }
 
 func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
+	s.Lock()
+	defer s.Unlock()
+	// initialize copilot
+	go func() {
+		if s.initialized {
+			return
+		}
+		s.sendLSPRequest(s.copilot, "initialize", KeyValue{})
+		s.sendLSPRequest(s.copilot, "signIn", KeyValue{})
+	}()
+
 	params := KeyValue{}
 	if err := json.Unmarshal(mr.Body, &params); err != nil {
 		cb <- &KeyValue{"result": "error", "message": err.Error()}
 		return
 	}
-
 	dir := params.string("dir", "")
 	if len(dir) == 0 {
 		cb <- &KeyValue{"result": "error", "message": "Empty dir"}
 		return
-
 	}
 
-	if s.initialized {
+	name := params.string("name", "unknown")
+	if s.currentWS != nil && s.currentWS.name == name {
 		cb <- &KeyValue{"result": "ok", "message": "already initialized"}
 		return
 	}
 
-	// initialize copilot
-	go func() {
-		s.sendLSPRequest(s.copilot, "initialize", KeyValue{})
-		s.sendLSPRequest(s.copilot, "signIn", KeyValue{})
-	}()
+	if !s.initialized {
+		// initialize intelephense
+		s.sendLSPRequest(s.intelephense, "initialize", params)
+		s.initialized = true
+		s.openFolders[name] = lsp.NewDocumentURI(dir)
+	} else if _, ok := s.openFolders[name]; !ok {
+		Log("First time opening workspace %s", name)
+		s.openFolders[name] = lsp.NewDocumentURI(dir)
+		params["folders"] = []KeyValue{}
+		for f, v := range s.openFolders {
+			params["folders"] = append(params["folders"].([]KeyValue), KeyValue{"uri": v, "name": f})
+		}
+		s.sendLSPRequest(s.intelephense, "initialize", params)
+	}
 
-	// initialize intelephense
-	s.sendLSPRequest(s.intelephense, "initialize", params)
-
-	s.initialized = true
-	//s.currentWS = &workSpace{"event", ""}
+	//go s.sendLSPRequest(s.intelephense, "didChangeWorkspaceFolders", KeyValue{
+	//	"uri":  s.openFolders[name],
+	//	"name": name,
+	//})
+	s.currentWS = &workSpace{name, dir}
 	cb <- &KeyValue{"result": "ok"}
 }
 
 func (s *mateServer) sendLSPRequest(out mrChan, method string, params KeyValue) *KeyValue {
-	s.Lock()
-	defer s.Unlock()
-
 	cb := make(kvChan)
 	body, _ := json.Marshal(params)
 	out <- &mateRequest{
@@ -244,14 +286,15 @@ func (s *mateServer) handlePanic(mr mateRequest) {
 
 func startServer(intelephense, copilot mrChan, port string) {
 	Log("Running webserver on port: %s", port)
-	server := mateServer{
+	server = mateServer{
 		intelephense: intelephense,
 		copilot:      copilot, initialized: false,
 		logger: &Logger{
 			IncomingPrefix: "HTTP <-- IDE", OutgoingPrefix: "HTTP --> IDE",
 			HiColor: hiGreenString, LoColor: greenString, ErrorColor: errorString,
 		},
-		openFiles: make(map[string]time.Time),
+		openFiles:   make(map[string]time.Time),
+		openFolders: make(map[string]lsp.DocumentURI),
 	}
 
 	log.Fatal(http.ListenAndServe(":"+port, &server))
