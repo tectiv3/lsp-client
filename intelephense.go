@@ -7,6 +7,7 @@ import (
 	"go.bug.st/json"
 	"log"
 	"os"
+	"time"
 )
 
 var iClient *handler
@@ -36,7 +37,7 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 
 	for {
 		request := <-in
-		Log("LSI <-- IDE %s %s %s", "request", request.Method, string(request.Body))
+		Log("LSI <-- IDE %s %s %db", "request", request.Method, len(string(request.Body)))
 
 		switch request.Method {
 		case "initialize":
@@ -76,7 +77,8 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 
 			}
 
-			_, respErr, err := lsc.Initialize(ctx, &lsp.InitializeParams{
+			ctxC, cancel := context.WithTimeout(ctx, time.Second)
+			_, respErr, err := lsc.Initialize(ctxC, &lsp.InitializeParams{
 				ProcessID: &pid,
 				//RootURI:   lsp.NewDocumentURI(dir),
 				//RootPath:  dir,
@@ -96,7 +98,7 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 				request.CB <- &KeyValue{"status": "error", "error": "initialize error"}
 				continue
 			}
-
+			cancel()
 			go lsc.Initialized(&lsp.InitializedParams{})
 			go lsc.WorkspaceDidChangeConfiguration(&lsp.DidChangeConfigurationParams{
 				Settings: lsp.KeyValue{

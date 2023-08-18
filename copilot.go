@@ -33,7 +33,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 	conn := lsc.GetConnection()
 	for {
 		request := <-in
-		Log("LSC <-- IDE %s %s %s", "request", request.Method, string(request.Body))
+		Log("LSC <-- IDE %s %s %db", "request", request.Method, len(string(request.Body)))
 
 		switch request.Method {
 		case "initialize":
