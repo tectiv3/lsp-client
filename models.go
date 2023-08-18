@@ -13,11 +13,13 @@ import (
 )
 
 type Config struct {
-	NodePath         string `json:"node_path"`
-	CopilotPath      string `json:"copilot_path"`
-	IntelephensePath string `json:"intelephense_path"`
-	Port             string `json:"port"`
-	EnableLogging    bool   `json:"enable_logging"`
+	NodePath            string `json:"node_path"`
+	CopilotPath         string `json:"copilot_path"`
+	IntelephensePath    string `json:"intelephense_path"`
+	IntelephenseLicense string `json:"intelephense_license"`
+	IntelephenseStorage string `json:"intelephense_storage"`
+	Port                string `json:"port"`
+	EnableLogging       bool   `json:"enable_logging"`
 }
 
 type signInResponse struct {

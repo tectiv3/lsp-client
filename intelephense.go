@@ -49,9 +49,9 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 				continue
 			}
 			dir := params.string("dir", "")
-			license := params.string("license", "")
+			license := params.string("license", config.IntelephenseLicense)
 			name := params.string("name", "phpProject")
-			storage := params.string("storage", "/tmp/intelephense/")
+			storage := params.string("storage", config.IntelephenseStorage)
 			var folders []lsp.WorkspaceFolder
 			paramFolders := params.array("folders", []interface{}{})
 			if len(paramFolders) > 0 {

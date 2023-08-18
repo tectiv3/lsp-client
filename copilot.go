@@ -27,6 +27,9 @@ func startCopilot(in mrChan) {
 }
 
 func (c *handler) processCopilotRequests(in mrChan) {
+	defer catchAndLogPanic(func() {
+		c.processCopilotRequests(in)
+	})
 	Log("Waiting for input")
 	ctx := context.Background()
 	lsc := c.lsc
@@ -44,7 +47,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 			lsc.Initialized(&lsp.InitializedParams{})
 			sendRequest("setEditorInfo", KeyValue{
 				"editorInfo":       KeyValue{"name": "Textmate", "version": "2.0.23"},
-				"editorPluginInfo": KeyValue{"name": "lsp-bridge", "version": "0.0.1"},
+				"editorPluginInfo": KeyValue{"name": "lsp-client", "version": "0.1.0"},
 			}, conn, ctx)
 			request.CB <- &KeyValue{"status": "ok"}
 		case "signIn":
@@ -67,14 +70,14 @@ func (c *handler) processCopilotRequests(in mrChan) {
 				resp := sendRequest("getCompletions", KeyValue{
 					"doc": KeyValue{
 						"source":       textDocument.string("text", ""),
-						"tabSize":      4,
+						"tabSize":      textDocument.int("tabSize", 4),
 						"indentSize":   4,
 						"insertSpaces": true,
 						"version":      0,
 						"path":         path,
 						"uri":          "file://" + path,
 						"relativePath": filepath.Base(path),
-						"languageId":   "php",
+						"languageId":   textDocument.string("languageId", ""),
 						"position":     position,
 					},
 				}, conn, ctx)
