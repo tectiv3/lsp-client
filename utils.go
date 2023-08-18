@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"go.bug.st/json"
 	"io"
 	"log"
 	"os"
@@ -38,5 +39,27 @@ func catchAndLogPanic(callback func()) {
 		LogError(fmt.Errorf("Panic: %s\n\n%s", reason, string(debug.Stack())))
 
 		go callback()
+	}
+}
+
+func Log(format string, a ...interface{}) {
+	logger.Logf(format, a...)
+}
+
+func LogError(err error) {
+	logger.Logf(errorString("Error: %v", err))
+}
+
+func readConfig() {
+	f, err := os.Open("config.json")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	decoder := json.NewDecoder(f)
+	err = decoder.Decode(&config)
+	if err != nil {
+		panic(err)
 	}
 }
