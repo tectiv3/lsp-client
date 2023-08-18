@@ -1,3 +1,4 @@
 /lsp-client
 .DS_Store
 logs
+config.json

@@ -12,12 +12,9 @@ import (
 var server mateServer
 
 func (s *mateServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		if err := Panicf(recover(), "%v", r.Method); err != nil {
-			LogError(err)
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-	}()
+	defer catchAndLogPanic(func() {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
 
 	//Log("method: %s, length: %d %s", r.Method, r.ContentLength, r.URL.Path)
 

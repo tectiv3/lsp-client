@@ -2,66 +2,65 @@ package main
 
 import (
 	"context"
-	"fmt"
 	lsp "github.com/tectiv3/go-lsp"
 	"github.com/tectiv3/go-lsp/jsonrpc"
 	"go.bug.st/json"
 	"io"
 	"log"
+	"os"
 	"os/exec"
-	"runtime"
 	"sync"
 )
 
-type cmdHandler struct {
+type handler struct {
 	lsc                   *lsp.Client
 	Diagnostics           chan *lsp.PublishDiagnosticsParams
 	waitingForDiagnostics bool
 	sync.Mutex
 }
 
-func (h cmdHandler) GetDiagnosticChannel() chan *lsp.PublishDiagnosticsParams {
+func (h handler) GetDiagnosticChannel() chan *lsp.PublishDiagnosticsParams {
 	return h.Diagnostics
 }
 
-func (h cmdHandler) ClientRegisterCapability(context.Context, jsonrpc.FunctionLogger, *lsp.RegistrationParams) *jsonrpc.ResponseError {
+func (h handler) ClientRegisterCapability(context.Context, jsonrpc.FunctionLogger, *lsp.RegistrationParams) *jsonrpc.ResponseError {
 	//Log("ClientRegisterCapability")
 	//h.client.GetConnection().SendNotification("client/registerCapability", lsp.EncodeMessage(KeyValue{}))
 	return nil
 }
 
 // ClientUnregisterCapability
-func (h cmdHandler) ClientUnregisterCapability(context.Context, jsonrpc.FunctionLogger, *lsp.UnregistrationParams) *jsonrpc.ResponseError {
+func (h handler) ClientUnregisterCapability(context.Context, jsonrpc.FunctionLogger, *lsp.UnregistrationParams) *jsonrpc.ResponseError {
 	return nil
 }
 
 // LogTrace
-func (h cmdHandler) LogTrace(logger jsonrpc.FunctionLogger, params *lsp.LogTraceParams) {
+func (h handler) LogTrace(logger jsonrpc.FunctionLogger, params *lsp.LogTraceParams) {
 	log.Printf("LogTrace: %v", params)
 }
 
 // Progress
-func (h cmdHandler) Progress(logger jsonrpc.FunctionLogger, params *lsp.ProgressParams) {
+func (h handler) Progress(logger jsonrpc.FunctionLogger, params *lsp.ProgressParams) {
 	log.Printf("Progress: %v", params)
 }
 
 // WindowShowMessage
-func (h cmdHandler) WindowShowMessage(logger jsonrpc.FunctionLogger, params *lsp.ShowMessageParams) {
+func (h handler) WindowShowMessage(logger jsonrpc.FunctionLogger, params *lsp.ShowMessageParams) {
 	log.Printf("WindowShowMessage: %v", params)
 }
 
 // WindowLogMessage
-func (h cmdHandler) WindowLogMessage(logger jsonrpc.FunctionLogger, params *lsp.LogMessageParams) {
+func (h handler) WindowLogMessage(logger jsonrpc.FunctionLogger, params *lsp.LogMessageParams) {
 	logger.Logf("WindowLogMessage: %v", params)
 }
 
 // TelemetryEvent
-func (h cmdHandler) TelemetryEvent(logger jsonrpc.FunctionLogger, msg json.RawMessage) {
+func (h handler) TelemetryEvent(logger jsonrpc.FunctionLogger, msg json.RawMessage) {
 	log.Printf("TelemetryEvent: %v", msg)
 }
 
 // TextDocumentPublishDiagnostics
-func (h cmdHandler) TextDocumentPublishDiagnostics(logger jsonrpc.FunctionLogger, params *lsp.PublishDiagnosticsParams) {
+func (h handler) TextDocumentPublishDiagnostics(logger jsonrpc.FunctionLogger, params *lsp.PublishDiagnosticsParams) {
 	go func() {
 		h.Lock()
 		defer h.Unlock()
@@ -78,22 +77,22 @@ func (h cmdHandler) TextDocumentPublishDiagnostics(logger jsonrpc.FunctionLogger
 }
 
 // WindowShowMessageRequest
-func (h cmdHandler) WindowShowMessageRequest(context.Context, jsonrpc.FunctionLogger, *lsp.ShowMessageRequestParams) (*lsp.MessageActionItem, *jsonrpc.ResponseError) {
+func (h handler) WindowShowMessageRequest(context.Context, jsonrpc.FunctionLogger, *lsp.ShowMessageRequestParams) (*lsp.MessageActionItem, *jsonrpc.ResponseError) {
 	return nil, nil
 }
 
 // WindowShowDocument
-func (h cmdHandler) WindowShowDocument(context.Context, jsonrpc.FunctionLogger, *lsp.ShowDocumentParams) (*lsp.ShowDocumentResult, *jsonrpc.ResponseError) {
+func (h handler) WindowShowDocument(context.Context, jsonrpc.FunctionLogger, *lsp.ShowDocumentParams) (*lsp.ShowDocumentResult, *jsonrpc.ResponseError) {
 	return nil, nil
 }
 
 // WindowWorkDoneProgressCreate
-func (h cmdHandler) WindowWorkDoneProgressCreate(context.Context, jsonrpc.FunctionLogger, *lsp.WorkDoneProgressCreateParams) *jsonrpc.ResponseError {
+func (h handler) WindowWorkDoneProgressCreate(context.Context, jsonrpc.FunctionLogger, *lsp.WorkDoneProgressCreateParams) *jsonrpc.ResponseError {
 	return nil
 }
 
 // WorkspaceWorkspaceFolders
-func (h cmdHandler) WorkspaceWorkspaceFolders(context.Context, jsonrpc.FunctionLogger) ([]lsp.WorkspaceFolder, *jsonrpc.ResponseError) {
+func (h handler) WorkspaceWorkspaceFolders(context.Context, jsonrpc.FunctionLogger) ([]lsp.WorkspaceFolder, *jsonrpc.ResponseError) {
 	folders := []lsp.WorkspaceFolder{}
 	// go over server openFolders and append to folders
 	for name, folder := range server.openFolders {
@@ -107,7 +106,7 @@ func (h cmdHandler) WorkspaceWorkspaceFolders(context.Context, jsonrpc.FunctionL
 }
 
 // WorkspaceConfiguration
-func (h cmdHandler) WorkspaceConfiguration(context.Context, jsonrpc.FunctionLogger, *lsp.ConfigurationParams) ([]json.RawMessage, *jsonrpc.ResponseError) {
+func (h handler) WorkspaceConfiguration(context.Context, jsonrpc.FunctionLogger, *lsp.ConfigurationParams) ([]json.RawMessage, *jsonrpc.ResponseError) {
 	cfg := KeyValue{
 		"files": KeyValue{
 			"maxSize":      300000,
@@ -241,33 +240,16 @@ func (h cmdHandler) WorkspaceConfiguration(context.Context, jsonrpc.FunctionLogg
 }
 
 // WorkspaceApplyEdit
-func (h cmdHandler) WorkspaceApplyEdit(context.Context, jsonrpc.FunctionLogger, *lsp.ApplyWorkspaceEditParams) (*lsp.ApplyWorkspaceEditResult, *jsonrpc.ResponseError) {
+func (h handler) WorkspaceApplyEdit(context.Context, jsonrpc.FunctionLogger, *lsp.ApplyWorkspaceEditParams) (*lsp.ApplyWorkspaceEditResult, *jsonrpc.ResponseError) {
 	return nil, nil
 }
 
 // WorkspaceCodeLensRefresh
-func (h cmdHandler) WorkspaceCodeLensRefresh(context.Context, jsonrpc.FunctionLogger) *jsonrpc.ResponseError {
+func (h handler) WorkspaceCodeLensRefresh(context.Context, jsonrpc.FunctionLogger) *jsonrpc.ResponseError {
 	return nil
 }
 
-// Panicf takes the return value of recover() and outputs data to the log with
-// the stack trace appended. Arguments are handled in the manner of
-// fmt.Printf. Arguments should format to a string which identifies what the
-// panic code was doing. Returns a non-nil error if it recovered from a panic.
-func Panicf(r interface{}, format string, v ...interface{}) error {
-	if r != nil {
-		// Same as net/http
-		const size = 64 << 10
-		buf := make([]byte, size)
-		buf = buf[:runtime.Stack(buf, false)]
-		id := fmt.Sprintf(format, v...)
-		log.Printf("panic serving %s: %v\n%s", id, r, string(buf))
-		return fmt.Errorf("unexpected panic: %v", r)
-	}
-	return nil
-}
-
-func startRPCServer(app, name string, args ...string) *cmdHandler {
+func startRPCServer(app, name string, args ...string) *handler {
 	var stdin io.WriteCloser
 	var stdout, stderr io.ReadCloser
 
@@ -288,10 +270,14 @@ func startRPCServer(app, name string, args ...string) *cmdHandler {
 	}
 
 	stdio := NewReadWriteCloser(stdout, stdin)
-	stdio = LogReadWriteCloserAs(stdio, app+".log")
-	go io.Copy(openLogFileAs(app+"-err.log"), stderr)
+	if config.EnableLogging {
+		stdio = LogReadWriteCloserAs(stdio, app+".log")
+		go io.Copy(openLogFileAs(app+"-err.log"), stderr)
+	} else {
+		go io.Copy(os.Stderr, stderr)
+	}
 
-	handler := &cmdHandler{
+	handler := &handler{
 		Diagnostics: make(chan *lsp.PublishDiagnosticsParams),
 	}
 	lsc := lsp.NewClient(stdio, stdio, handler, func(err error) {

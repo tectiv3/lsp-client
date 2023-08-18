@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 )
 
-var cClient *cmdHandler
+var cClient *handler
 
 func startCopilot(in mrChan) {
-	cClient = startRPCServer("copilot", "/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/copilot-node-server", "--stdio")
+	cClient = startRPCServer("copilot", config.NodePath, config.CopilotPath, "--stdio")
 
 	cClient.lsc.SetLogger(&Logger{
 		IncomingPrefix: "LSC <-- Copilot", OutgoingPrefix: "LSC --> Copilot",
@@ -26,7 +26,7 @@ func startCopilot(in mrChan) {
 	go cClient.processCopilotRequests(in)
 }
 
-func (c *cmdHandler) processCopilotRequests(in mrChan) {
+func (c *handler) processCopilotRequests(in mrChan) {
 	Log("Waiting for input")
 	ctx := context.Background()
 	lsc := c.lsc

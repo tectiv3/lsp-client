@@ -7,19 +7,17 @@ import (
 	"github.com/tectiv3/go-lsp/jsonrpc"
 	"go.bug.st/json"
 	"io"
-	"log"
 	"os"
 	"sync"
 	"time"
 )
 
-type ClientInfo struct {
-	Name    string  `json:"name,required"`
-	Version *string `json:"version,omitempty"`
-}
-
-type Workspace struct {
-	WorkspaceFolders bool `json:"workspaceFolders,omitempty"`
+type Config struct {
+	NodePath         string `json:"node_path"`
+	CopilotPath      string `json:"copilot_path"`
+	IntelephensePath string `json:"intelephense_path"`
+	Port             string `json:"port"`
+	EnableLogging    bool   `json:"enable_logging"`
 }
 
 type signInResponse struct {
@@ -162,52 +160,6 @@ type workSpace struct {
 
 type kvChan chan *KeyValue
 type mrChan chan *mateRequest
-
-type DocumentURI string
-
-type TextDocumentItem struct {
-	/**
-	 * The text document's URI.
-	 */
-	URI DocumentURI `json:"uri"`
-	/**
-	 * The text document's language identifier.
-	 */
-	LanguageID string `json:"languageId"`
-	/**
-	 * The version number of this document (it will strictly increase after each
-	 * change, including undo/redo).
-	 */
-	Version int `json:"version"`
-	/**
-	 * The content of the opened text document.
-	 */
-	Text string `json:"text"`
-}
-
-// NewReadWriteCloser create an io.ReadWriteCloser from given io.ReadCloser and io.WriteCloser.
-func NewReadWriteCloser(in io.ReadCloser, out io.WriteCloser) io.ReadWriteCloser {
-	return &combinedReadWriteCloser{in, out}
-}
-
-// OpenLogFileAs creates a log file in GlobalLogDirectory.
-func openLogFileAs(filename string) *os.File {
-	path := "./logs/" + filename
-	res, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		log.Fatalf("Error opening log file: %s", err)
-	}
-	res.WriteString("\n\n\nStarted logging.\n")
-
-	return res
-}
-
-func LogReadWriteCloserAs(upstream io.ReadWriteCloser, filename string) io.ReadWriteCloser {
-	return &dumper{
-		upstream: upstream,
-		logfile:  openLogFileAs(filename),
-	}
-}
 
 type dumper struct {
 	upstream io.ReadWriteCloser

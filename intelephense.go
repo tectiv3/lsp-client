@@ -9,10 +9,10 @@ import (
 	"os"
 )
 
-var iClient *cmdHandler
+var iClient *handler
 
 func startIntelephense(in mrChan) {
-	iClient = startRPCServer("intelephense", "/opt/homebrew/opt/node@16/bin/node", "/opt/homebrew/bin/intelephense", "--stdio")
+	iClient = startRPCServer("intelephense", config.NodePath, config.IntelephensePath, "--stdio")
 
 	iClient.lsc.SetLogger(&Logger{
 		IncomingPrefix: "LSI <-- Intelephense", OutgoingPrefix: "LSI --> Intelephense",
@@ -25,7 +25,11 @@ func startIntelephense(in mrChan) {
 	go iClient.processIntelephenseRequests(in)
 }
 
-func (c *cmdHandler) processIntelephenseRequests(in mrChan) {
+func (c *handler) processIntelephenseRequests(in mrChan) {
+	defer catchAndLogPanic(func() {
+		c.processIntelephenseRequests(in)
+	})
+
 	Log("Waiting for input")
 	ctx := context.Background()
 	lsc := c.lsc
