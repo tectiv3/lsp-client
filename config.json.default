@@ -1,9 +1,11 @@
 {
   "node_path": "/opt/homebrew/opt/node@16/bin/node",
   "copilot_path": "/opt/homebrew/bin/copilot-node-server",
+  "volar_path": "/opt/homebrew/bin/vue-language-server",
   "intelephense_path": "/opt/homebrew/bin/intelephense",
   "intelephense_license": "",
   "intelephense_storage": "/tmp/intelephense",
+  "tsdk_path": "~/.config/yarn/global/node_modules/typescript/lib/",
   "port": "8787",
   "enable_logging": true
 }

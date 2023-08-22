@@ -15,9 +15,11 @@ import (
 type Config struct {
 	NodePath            string `json:"node_path"`
 	CopilotPath         string `json:"copilot_path"`
+	VolarPath           string `json:"volar_path"`
 	IntelephensePath    string `json:"intelephense_path"`
 	IntelephenseLicense string `json:"intelephense_license"`
 	IntelephenseStorage string `json:"intelephense_storage"`
+	TsdkPath            string `json:"tsdk_path"`
 	Port                string `json:"port"`
 	EnableLogging       bool   `json:"enable_logging"`
 }
@@ -147,6 +149,7 @@ type mateRequest struct {
 type mateServer struct {
 	copilot      mrChan
 	intelephense mrChan
+	volar        mrChan
 	initialized  bool
 	logger       jsonrpc.Logger
 	openFiles    map[string]time.Time

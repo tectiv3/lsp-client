@@ -10,34 +10,34 @@ import (
 	"time"
 )
 
-var iClient *handler
+var vClient *handler
 
-func startIntelephense(in mrChan) {
-	iClient = startRPCServer("intelephense", config.NodePath, config.IntelephensePath, "--stdio")
+func startVolar(in mrChan) {
+	vClient = startRPCServer("volar", config.NodePath, config.VolarPath, "--stdio")
 
-	iClient.lsc.SetLogger(&Logger{
-		IncomingPrefix: "LSI <-- Intelephense", OutgoingPrefix: "LSI --> Intelephense",
-		HiColor: hiRedString, LoColor: redString, ErrorColor: errorString,
+	vClient.lsc.SetLogger(&Logger{
+		IncomingPrefix: "LSV <-- Volar", OutgoingPrefix: "LSV --> Volar",
+		HiColor: hiBlueString, LoColor: blueString, ErrorColor: errorString,
 	})
-	iClient.lsc.RegisterCustomNotification("indexingStarted", func(jsonrpc.FunctionLogger, json.RawMessage) {})
-	iClient.lsc.RegisterCustomNotification("indexingEnded", func(jsonrpc.FunctionLogger, json.RawMessage) {})
+	vClient.lsc.RegisterCustomNotification("indexingStarted", func(jsonrpc.FunctionLogger, json.RawMessage) {})
+	vClient.lsc.RegisterCustomNotification("indexingEnded", func(jsonrpc.FunctionLogger, json.RawMessage) {})
 
-	go iClient.lsc.Run()
-	go iClient.processIntelephenseRequests(in)
+	go vClient.lsc.Run()
+	go vClient.processVolarRequests(in)
 }
 
-func (c *handler) processIntelephenseRequests(in mrChan) {
+func (c *handler) processVolarRequests(in mrChan) {
 	defer catchAndLogPanic(func() {
-		c.processIntelephenseRequests(in)
+		c.processVolarRequests(in)
 	})
 
-	Log("Intelephense is waiting for input")
+	Log("Volar is waiting for input")
 	ctx := context.Background()
 	lsc := c.lsc
 
 	for {
 		request := <-in
-		Log("LSI <-- IDE %s %s %db", "request", request.Method, len(string(request.Body)))
+		Log("LSV <-- IDE %s %s %db", "request", request.Method, len(string(request.Body)))
 
 		switch request.Method {
 		case "initialize":
@@ -49,9 +49,7 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 				continue
 			}
 			dir := params.string("dir", "")
-			license := params.string("license", config.IntelephenseLicense)
-			name := params.string("name", "phpProject")
-			storage := params.string("storage", config.IntelephenseStorage)
+			name := params.string("name", "vueProject")
 			var folders []lsp.WorkspaceFolder
 			paramFolders := params.array("folders", []interface{}{})
 			if len(paramFolders) > 0 {
@@ -83,8 +81,11 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 				//RootURI:   lsp.NewDocumentURI(dir),
 				//RootPath:  dir,
 				InitializationOptions: lsp.KeyValue{
-					"storagePath": storage, "clearCache": true,
-					"licenceKey": license, "isVscode": true,
+					"clearCache": true, "isVscode": true,
+					"syntaxes": []string{"vue"},
+					"typescript": lsp.KeyValue{
+						"tsdk": config.TsdkPath,
+					},
 				},
 				Capabilities: lsp.KeyValue{
 					"workspace":        KeyValue{"workspaceFolders": true},
@@ -100,11 +101,7 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 			}
 			cancel()
 			go lsc.Initialized(&lsp.InitializedParams{})
-			go lsc.WorkspaceDidChangeConfiguration(&lsp.DidChangeConfigurationParams{
-				Settings: lsp.KeyValue{
-					"intelephense": KeyValue{"files": KeyValue{"maxSize": 3000000}},
-				},
-			})
+
 			request.CB <- &KeyValue{"status": "ok"}
 		case "textDocument/hover":
 			params := lsp.TextDocumentPositionParams{}

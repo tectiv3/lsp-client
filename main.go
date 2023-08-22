@@ -14,11 +14,16 @@ func main() {
 	// start copilot LS
 	copilotChan := make(mrChan, 2)
 	go startCopilot(copilotChan)
-	// start intelephense LS
+	// start php intelephense LS
 	intelephenseChan := make(mrChan, 2)
 	go startIntelephense(intelephenseChan)
+
+	// start vue LS
+	volarChan := make(mrChan, 2)
+	go startVolar(volarChan)
+
 	// start webserver
-	go startServer(intelephenseChan, copilotChan, config.Port)
+	go startServer(intelephenseChan, copilotChan, volarChan, config.Port)
 
 	// wait for ctrl-c
 	c := make(chan os.Signal, 1)

@@ -196,11 +196,17 @@ func hiGreenString(format string, a ...interface{}) string {
 func hiMagentaString(format string, a ...interface{}) string {
 	return colorFormat(format, FgHiMagenta, a...)
 }
+func hiBlueString(format string, a ...interface{}) string {
+	return colorFormat(format, FgHiBlue, a...)
+}
 func redString(format string, a ...interface{}) string {
 	return colorFormat(format, FgRed, a...)
 }
 func greenString(format string, a ...interface{}) string {
 	return colorFormat(format, FgGreen, a...)
+}
+func blueString(format string, a ...interface{}) string {
+	return colorFormat(format, FgBlue, a...)
 }
 func colorFormat(format string, color int, a ...interface{}) string {
 	return c_format(color) + fmt.Sprintf(format, a...) + c_unformat()

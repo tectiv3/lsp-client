@@ -30,7 +30,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 	defer catchAndLogPanic(func() {
 		c.processCopilotRequests(in)
 	})
-	Log("Waiting for input")
+	Log("Copilot is waiting for input")
 	ctx := context.Background()
 	lsc := c.lsc
 	conn := lsc.GetConnection()
@@ -121,6 +121,14 @@ func (c *handler) processCopilotRequests(in mrChan) {
 				Version:    textDocument.int("version", 0),
 				Text:       textDocument.string("text", ""),
 			}})
+			request.CB <- &KeyValue{"status": "ok"}
+		case "textDocument/didClose":
+			textDocument := lsp.TextDocumentIdentifier{}
+			if err := json.Unmarshal(request.Body, &textDocument); err != nil {
+				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
+				return
+			}
+			go lsc.TextDocumentDidClose(&lsp.DidCloseTextDocumentParams{TextDocument: textDocument})
 			request.CB <- &KeyValue{"status": "ok"}
 		}
 	}

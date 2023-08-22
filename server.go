@@ -75,8 +75,8 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 	case "hover":
 		//params := lsp.TextDocumentPositionParams{}
 		//if err := json.Unmarshal(mr.Body, &params); err != nil {
-		//	cb <- &KeyValue{"result": "error", "message": err.Error()}
-		//	return
+		//  cb <- &KeyValue{"result": "error", "message": err.Error()}
+		//  return
 		//}
 		//s.requestAndWait("textDocument/hover", params, cb)
 		params := KeyValue{}
@@ -84,14 +84,20 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 			cb <- &KeyValue{"result": "error", "message": err.Error()}
 			return
 		}
-		resp := s.sendLSPRequest(s.intelephense, "textDocument/hover", params)
+		languageId := params.string("languageId", "")
+		var result *KeyValue
+		if languageId == "php" {
+			result = s.sendLSPRequest(s.intelephense, "textDocument/hover", params)
+		} else {
+			result = s.sendLSPRequest(s.volar, "textDocument/hover", params)
+		}
 
-		cb <- resp
+		cb <- result
 	case "completion":
 		//params := lsp.CompletionParams{}
 		//if err := json.Unmarshal(mr.Body, &params); err != nil {
-		//	cb <- &KeyValue{"result": "error", "message": err.Error()}
-		//	return
+		//  cb <- &KeyValue{"result": "error", "message": err.Error()}
+		//  return
 		//}
 		//s.requestAndWait("textDocument/completion", params, cb)
 		params := KeyValue{}
@@ -99,14 +105,20 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 			cb <- &KeyValue{"result": "error", "message": err.Error()}
 			return
 		}
-		result := s.sendLSPRequest(s.intelephense, "textDocument/completion", params)
+		languageId := params.string("languageId", "")
+		var result *KeyValue
+		if languageId == "php" {
+			result = s.sendLSPRequest(s.intelephense, "textDocument/completion", params)
+		} else {
+			result = s.sendLSPRequest(s.volar, "textDocument/completion", params)
+		}
 		Log("Sending completion response")
 		cb <- result
 	case "definition":
 		//params := lsp.TextDocumentPositionParams{}
 		//if err := json.Unmarshal(mr.Body, &params); err != nil {
-		//	cb <- &KeyValue{"result": "error", "message": err.Error()}
-		//	return
+		//  cb <- &KeyValue{"result": "error", "message": err.Error()}
+		//  return
 		//}
 		//s.requestAndWait("textDocument/definition", params, cb)
 		params := KeyValue{}
@@ -114,7 +126,13 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 			cb <- &KeyValue{"result": "error", "message": err.Error()}
 			return
 		}
-		result := s.sendLSPRequest(s.intelephense, "textDocument/definition", params)
+		languageId := params.string("languageId", "")
+		var result *KeyValue
+		if languageId == "php" {
+			result = s.sendLSPRequest(s.intelephense, "textDocument/definition", params)
+		} else {
+			result = s.sendLSPRequest(s.volar, "textDocument/definition", params)
+		}
 		Log("Sending definition response")
 		cb <- result
 
@@ -154,18 +172,19 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 	}
 
 	fn := params.string("uri", "")
+	languageId := params.string("languageId", "")
 	if len(fn) == 0 {
 		cb <- &KeyValue{"result": "error", "message": "Invalid document uri"}
 		return
 	}
 
-	if _, ok := s.openFiles[fn]; ok {
-		//Log("file %s already opened", fn)
-		//s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
-		//	"uri": fn,
-		//})
-		//time.Sleep(100 * time.Millisecond)
-	}
+	//if _, ok := s.openFiles[fn]; ok {
+	//Log("file %s already opened", fn)
+	//s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
+	//  "uri": fn,
+	//})
+	//time.Sleep(100 * time.Millisecond)
+	//}
 	s.openFiles[fn] = time.Now()
 	// sort slice and remove items if there are over 20 of them
 	if len(s.openFiles) > 19 {
@@ -177,17 +196,35 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 				s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
 					"uri": k,
 				})
+				s.sendLSPRequest(s.volar, "textDocument/didClose", KeyValue{
+					"uri": k,
+				})
+				s.sendLSPRequest(s.copilot, "textDocument/didClose", KeyValue{
+					"uri": k,
+				})
 			}
 		}
 	}
 
-	Log("getting diagnostics for %s", fn)
-	s.sendLSPRequest(s.intelephense, "textDocument/didOpen", params)
 	go s.sendLSPRequest(s.copilot, "textDocument/didOpen", params)
+	if languageId == "vue" {
+		s.sendLSPRequest(s.volar, "textDocument/didOpen", params)
+		diagnostics := s.sendLSPRequest(s.volar, "textDocument/documentSymbol", KeyValue{"textDocument": KeyValue{"uri": fn}})
 
-	diagnostics := s.sendLSPRequest(s.intelephense, "textDocument/documentSymbol", KeyValue{"textDocument": KeyValue{"uri": fn}})
-	Log("Sending diagnostics response")
-	cb <- diagnostics
+		Log("Sending diagnostics response")
+		cb <- diagnostics
+		return
+	} else if languageId == "php" {
+		Log("getting diagnostics for %s", fn)
+		s.sendLSPRequest(s.intelephense, "textDocument/didOpen", params)
+		diagnostics := s.sendLSPRequest(s.intelephense, "textDocument/documentSymbol", KeyValue{"textDocument": KeyValue{"uri": fn}})
+
+		Log("Sending diagnostics response")
+		cb <- diagnostics
+		return
+	}
+
+	cb <- &KeyValue{"result": "ok"}
 }
 
 func (s *mateServer) onDidClose(mr mateRequest, cb kvChan) {
@@ -203,7 +240,13 @@ func (s *mateServer) onDidClose(mr mateRequest, cb kvChan) {
 		cb <- &KeyValue{"result": "error", "message": "Invalid document uri"}
 		return
 	}
-	s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
+	go s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
+		"uri": fn,
+	})
+	go s.sendLSPRequest(s.volar, "textDocument/didClose", KeyValue{
+		"uri": fn,
+	})
+	go s.sendLSPRequest(s.copilot, "textDocument/didClose", KeyValue{
 		"uri": fn,
 	})
 	delete(s.openFiles, fn)
@@ -243,6 +286,7 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 	if !s.initialized {
 		// initialize intelephense
 		s.sendLSPRequest(s.intelephense, "initialize", params)
+		s.sendLSPRequest(s.volar, "initialize", params)
 		s.initialized = true
 		s.openFolders[name] = lsp.NewDocumentURI(dir)
 	} else if _, ok := s.openFolders[name]; !ok {
@@ -253,11 +297,12 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 			params["folders"] = append(params["folders"].([]KeyValue), KeyValue{"uri": v, "name": f})
 		}
 		s.sendLSPRequest(s.intelephense, "initialize", params)
+		s.sendLSPRequest(s.volar, "initialize", params)
 	}
 
 	//go s.sendLSPRequest(s.intelephense, "didChangeWorkspaceFolders", KeyValue{
-	//	"uri":  s.openFolders[name],
-	//	"name": name,
+	//  "uri":  s.openFolders[name],
+	//  "name": name,
 	//})
 	s.currentWS = &workSpace{name, dir}
 	cb <- &KeyValue{"result": "ok"}
@@ -281,11 +326,13 @@ func (s *mateServer) handlePanic(mr mateRequest) {
 	}
 }
 
-func startServer(intelephense, copilot mrChan, port string) {
+func startServer(intelephense, copilot, volar mrChan, port string) {
 	Log("Running webserver on port: %s", port)
 	server = mateServer{
 		intelephense: intelephense,
-		copilot:      copilot, initialized: false,
+		volar:        volar,
+		copilot:      copilot,
+		initialized:  false,
 		logger: &Logger{
 			IncomingPrefix: "HTTP <-- IDE", OutgoingPrefix: "HTTP --> IDE",
 			HiColor: hiGreenString, LoColor: greenString, ErrorColor: errorString,
