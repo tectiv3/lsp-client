@@ -13,6 +13,16 @@ import (
 var vClient *handler
 
 func startVolar(in mrChan) {
+	if len(config.VolarPath) == 0 {
+		Log("Volar path not set")
+		go func() {
+			for {
+				request := <-in
+				request.CB <- &KeyValue{"status": "ok"}
+			}
+		}()
+		return
+	}
 	vClient = startRPCServer("volar", config.NodePath, config.VolarPath, "--stdio")
 
 	vClient.lsc.SetLogger(&Logger{

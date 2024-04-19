@@ -43,7 +43,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 			sendRequest("initialize", KeyValue{
 				"capabilities": KeyValue{"workspace": KeyValue{"workspaceFolders": true}},
 			}, conn, ctx)
-			log.Println("After initialize")
+			//log.Println("After initialize")
 			lsc.Initialized(&lsp.InitializedParams{})
 			sendRequest("setEditorInfo", KeyValue{
 				"editorInfo":       KeyValue{"name": "Textmate", "version": "2.0.23"},

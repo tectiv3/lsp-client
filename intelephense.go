@@ -13,6 +13,16 @@ import (
 var iClient *handler
 
 func startIntelephense(in mrChan) {
+	if len(config.IntelephensePath) == 0 {
+		Log("Intelephense path not set")
+		go func() {
+			for {
+				request := <-in
+				request.CB <- &KeyValue{"status": "ok"}
+			}
+		}()
+		return
+	}
 	iClient = startRPCServer("intelephense", config.NodePath, config.IntelephensePath, "--stdio")
 
 	iClient.lsc.SetLogger(&Logger{
@@ -174,7 +184,7 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 			textDocument := &KeyValue{}
 			if err := json.Unmarshal(request.Body, textDocument); err != nil {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
-				return
+				continue
 			}
 			uri, _ := lsp.NewDocumentURIFromURL(textDocument.string("uri", ""))
 			go lsc.TextDocumentDidOpen(&lsp.DidOpenTextDocumentParams{TextDocument: lsp.TextDocumentItem{
@@ -188,7 +198,7 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 			textDocument := lsp.TextDocumentIdentifier{}
 			if err := json.Unmarshal(request.Body, &textDocument); err != nil {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
-				return
+				continue
 			}
 			go lsc.TextDocumentDidClose(&lsp.DidCloseTextDocumentParams{TextDocument: textDocument})
 			request.CB <- &KeyValue{"status": "ok"}

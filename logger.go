@@ -99,12 +99,12 @@ func (l *Logger) LogIncomingNotification(method string, params json.RawMessage) 
 
 // LogIncomingDataDelay prints the delay of incoming data into the log
 func (l *Logger) LogIncomingDataDelay(delay time.Duration) {
-	log.Printf("IN Elapsed: %v", delay)
+	//log.Printf("IN Elapsed: %v", delay)
 }
 
 // LogOutgoingDataDelay prints the delay of outgoing data into the log
 func (l *Logger) LogOutgoingDataDelay(delay time.Duration) {
-	log.Printf("OUT Elapsed: %v", delay)
+	//log.Printf("OUT Elapsed: %v", delay)
 }
 
 // FunctionLogger is a lsp function logger
