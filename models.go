@@ -16,6 +16,7 @@ type Config struct {
 	NodePath            string `json:"node_path"`
 	CopilotPath         string `json:"copilot_path"`
 	VolarPath           string `json:"volar_path"`
+	GoplsPath           string `json:"gopls_path"`
 	IntelephensePath    string `json:"intelephense_path"`
 	IntelephenseLicense string `json:"intelephense_license"`
 	IntelephenseStorage string `json:"intelephense_storage"`
@@ -150,6 +151,7 @@ type mateServer struct {
 	copilot      mrChan
 	intelephense mrChan
 	volar        mrChan
+	gopls        mrChan
 	initialized  bool
 	logger       jsonrpc.Logger
 	openFiles    map[string]time.Time

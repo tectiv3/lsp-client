@@ -10,11 +10,11 @@ import (
 	"time"
 )
 
-var vClient *handler
+var gClient *handler
 
-func startVolar(in mrChan) {
-	if len(config.VolarPath) == 0 {
-		Log("Volar path not set")
+func startGopls(in mrChan) {
+	if len(config.GoplsPath) == 0 {
+		Log("Gopls path not set")
 		go func() {
 			for {
 				request := <-in
@@ -23,119 +23,8 @@ func startVolar(in mrChan) {
 		}()
 		return
 	}
-	vClient = startRPCServer("volar", config.NodePath, config.VolarPath, "--stdio")
-	vClient.SetConfig(KeyValue{
-		"files": KeyValue{
-			"maxSize":      300000,
-			"associations": []string{"*.vue", "*.js"},
-			"exclude": []string{
-				"**/.git/**",
-				"**/.svn/**",
-				"**/.hg/**",
-				"**/CVS/**",
-				"**/.DS_Store/**",
-				"**/node_modules/**",
-				"**/bower_components/**",
-				"**/vendor/**/{Test,test,Tests,tests}/**",
-				"**/.git",
-				"**/.svn",
-				"**/.hg",
-				"**/CVS",
-				"**/.DS_Store",
-				"**/nova/tests/**",
-				"**/faker/**",
-				"**/*.log",
-				"**/*.log*",
-				"**/*.min.*",
-				"**/dist",
-				"**/coverage",
-				"**/build/*",
-				"**/nova/public/*",
-				"**/public/*",
-			},
-		},
-		"stubs": []string{
-			"apache",
-			"bcmath",
-			"bz2",
-			"calendar",
-			"com_dotnet",
-			"Core",
-			"ctype",
-			"curl",
-			"date",
-			"dba",
-			"dom",
-			"enchant",
-			"exif",
-			"fileinfo",
-			"filter",
-			"fpm",
-			"ftp",
-			"gd",
-			"hash",
-			"iconv",
-			"imap",
-			"interbase",
-			"intl",
-			"json",
-			"ldap",
-			"libxml",
-			"mbstring",
-			"mcrypt",
-			"meta",
-			"mssql",
-			"mysqli",
-			"oci8",
-			"odbc",
-			"openssl",
-			"pcntl",
-			"pcre",
-			"PDO",
-			"pdo_ibm",
-			"pdo_mysql",
-			"pdo_pgsql",
-			"pdo_sqlite",
-			"pgsql",
-			"Phar",
-			"posix",
-			"pspell",
-			"readline",
-			"recode",
-			"Reflection",
-			"regex",
-			"session",
-			"shmop",
-			"SimpleXML",
-			"snmp",
-			"soap",
-			"sockets",
-			"sodium",
-			"SPL",
-			"sqlite3",
-			"standard",
-			"superglobals",
-			"sybase",
-			"sysvmsg",
-			"sysvsem",
-			"sysvshm",
-			"tidy",
-			"tokenizer",
-			"wddx",
-			"xml",
-			"xmlreader",
-			"xmlrpc",
-			"xmlwriter",
-			"Zend OPcache",
-			"zip",
-			"zlib",
-		},
-		"completion": KeyValue{
-			"insertUseDeclaration":                    true,
-			"fullyQualifyGlobalConstantsAndFunctions": false,
-			"triggerParameterHints":                   true,
-			"maxItems":                                100,
-		},
+	gClient = startRPCServer("gopls", config.GoplsPath, "serve")
+	gClient.SetConfig(KeyValue{
 		"format": KeyValue{
 			"enable": false,
 		},
@@ -145,34 +34,33 @@ func startVolar(in mrChan) {
 		},
 		"runtime":   "",
 		"maxMemory": 0,
-		"telemetry": KeyValue{"enabled": false},
 		"trace": KeyValue{
 			"server": "verbose",
 		},
 	})
-	vClient.lsc.SetLogger(&Logger{
-		IncomingPrefix: "LSV <-- Volar", OutgoingPrefix: "LSV --> Volar",
-		HiColor: hiBlueString, LoColor: blueString, ErrorColor: errorString,
+	gClient.lsc.SetLogger(&Logger{
+		IncomingPrefix: "LSI <-- Gopls", OutgoingPrefix: "LSI --> Gopls",
+		HiColor: hiRedString, LoColor: redString, ErrorColor: errorString,
 	})
-	vClient.lsc.RegisterCustomNotification("indexingStarted", func(jsonrpc.FunctionLogger, json.RawMessage) {})
-	vClient.lsc.RegisterCustomNotification("indexingEnded", func(jsonrpc.FunctionLogger, json.RawMessage) {})
+	gClient.lsc.RegisterCustomNotification("indexingStarted", func(jsonrpc.FunctionLogger, json.RawMessage) {})
+	gClient.lsc.RegisterCustomNotification("indexingEnded", func(jsonrpc.FunctionLogger, json.RawMessage) {})
 
-	go vClient.lsc.Run()
-	go vClient.processVolarRequests(in)
+	go gClient.lsc.Run()
+	go gClient.processGoplsRequests(in)
 }
 
-func (c *handler) processVolarRequests(in mrChan) {
+func (c *handler) processGoplsRequests(in mrChan) {
 	defer catchAndLogPanic(func() {
-		c.processVolarRequests(in)
+		c.processGoplsRequests(in)
 	})
 
-	Log("Volar is waiting for input")
+	Log("Gopls is waiting for input")
 	ctx := context.Background()
 	lsc := c.lsc
 
 	for {
 		request := <-in
-		Log("LSV <-- IDE %s %s %db", "request", request.Method, len(string(request.Body)))
+		Log("LSI <-- IDE %s %s %db", "request", request.Method, len(string(request.Body)))
 
 		switch request.Method {
 		case "initialize":
@@ -184,7 +72,8 @@ func (c *handler) processVolarRequests(in mrChan) {
 				continue
 			}
 			dir := params.string("dir", "")
-			name := params.string("name", "vueProject")
+			name := params.string("name", "goProject")
+
 			var folders []lsp.WorkspaceFolder
 			paramFolders := params.array("folders", []interface{}{})
 			if len(paramFolders) > 0 {
@@ -215,15 +104,9 @@ func (c *handler) processVolarRequests(in mrChan) {
 				ProcessID: &pid,
 				//RootURI:   lsp.NewDocumentURI(dir),
 				//RootPath:  dir,
-				InitializationOptions: lsp.KeyValue{
-					"clearCache": true, "isVscode": true,
-					"syntaxes": []string{"vue"},
-					"typescript": lsp.KeyValue{
-						"tsdk": config.TsdkPath,
-					},
-				},
+				InitializationOptions: lsp.KeyValue{},
 				Capabilities: lsp.KeyValue{
-					"workspace":        KeyValue{"workspaceFolders": true},
+					"workspace":        KeyValue{"workspaceFolders": true, "configuration": true},
 					"workspaceFolders": folders,
 				},
 				WorkspaceFolders: &folders,
@@ -236,7 +119,11 @@ func (c *handler) processVolarRequests(in mrChan) {
 			}
 			cancel()
 			go lsc.Initialized(&lsp.InitializedParams{})
-
+			go lsc.WorkspaceDidChangeConfiguration(&lsp.DidChangeConfigurationParams{
+				Settings: lsp.KeyValue{
+					// "intelephense": KeyValue{"files": KeyValue{"maxSize": 3000000}},
+				},
+			})
 			request.CB <- &KeyValue{"status": "ok"}
 		case "textDocument/hover":
 			params := lsp.TextDocumentPositionParams{}
@@ -306,7 +193,7 @@ func (c *handler) processVolarRequests(in mrChan) {
 			textDocument := &KeyValue{}
 			if err := json.Unmarshal(request.Body, textDocument); err != nil {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
-				return
+				continue
 			}
 			uri, _ := lsp.NewDocumentURIFromURL(textDocument.string("uri", ""))
 			go lsc.TextDocumentDidOpen(&lsp.DidOpenTextDocumentParams{TextDocument: lsp.TextDocumentItem{
@@ -320,7 +207,7 @@ func (c *handler) processVolarRequests(in mrChan) {
 			textDocument := lsp.TextDocumentIdentifier{}
 			if err := json.Unmarshal(request.Body, &textDocument); err != nil {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
-				return
+				continue
 			}
 			go lsc.TextDocumentDidClose(&lsp.DidCloseTextDocumentParams{TextDocument: textDocument})
 			request.CB <- &KeyValue{"status": "ok"}

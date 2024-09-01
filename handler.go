@@ -16,7 +16,12 @@ type handler struct {
 	lsc                   *lsp.Client
 	Diagnostics           chan *lsp.PublishDiagnosticsParams
 	waitingForDiagnostics bool
+	config                KeyValue
 	sync.Mutex
+}
+
+func (h handler) SetConfig(config KeyValue) {
+	h.config = config
 }
 
 func (h handler) GetDiagnosticChannel() chan *lsp.PublishDiagnosticsParams {
@@ -107,134 +112,7 @@ func (h handler) WorkspaceWorkspaceFolders(context.Context, jsonrpc.FunctionLogg
 
 // WorkspaceConfiguration
 func (h handler) WorkspaceConfiguration(context.Context, jsonrpc.FunctionLogger, *lsp.ConfigurationParams) ([]json.RawMessage, *jsonrpc.ResponseError) {
-	cfg := KeyValue{
-		"files": KeyValue{
-			"maxSize":      300000,
-			"associations": []string{"*.php", "*.phtml"},
-			"exclude": []string{
-				"**/.git/**",
-				"**/.svn/**",
-				"**/.hg/**",
-				"**/CVS/**",
-				"**/.DS_Store/**",
-				"**/node_modules/**",
-				"**/bower_components/**",
-				"**/vendor/**/{Test,test,Tests,tests}/**",
-				"**/.git",
-				"**/.svn",
-				"**/.hg",
-				"**/CVS",
-				"**/.DS_Store",
-				"**/nova/tests/**",
-				"**/faker/**",
-				"**/*.log",
-				"**/*.log*",
-				"**/*.min.*",
-				"**/dist",
-				"**/coverage",
-				"**/build/*",
-				"**/nova/public/*",
-				"**/public/*",
-			},
-		},
-		"stubs": []string{
-			"apache",
-			"bcmath",
-			"bz2",
-			"calendar",
-			"com_dotnet",
-			"Core",
-			"ctype",
-			"curl",
-			"date",
-			"dba",
-			"dom",
-			"enchant",
-			"exif",
-			"fileinfo",
-			"filter",
-			"fpm",
-			"ftp",
-			"gd",
-			"hash",
-			"iconv",
-			"imap",
-			"interbase",
-			"intl",
-			"json",
-			"ldap",
-			"libxml",
-			"mbstring",
-			"mcrypt",
-			"meta",
-			"mssql",
-			"mysqli",
-			"oci8",
-			"odbc",
-			"openssl",
-			"pcntl",
-			"pcre",
-			"PDO",
-			"pdo_ibm",
-			"pdo_mysql",
-			"pdo_pgsql",
-			"pdo_sqlite",
-			"pgsql",
-			"Phar",
-			"posix",
-			"pspell",
-			"readline",
-			"recode",
-			"Reflection",
-			"regex",
-			"session",
-			"shmop",
-			"SimpleXML",
-			"snmp",
-			"soap",
-			"sockets",
-			"sodium",
-			"SPL",
-			"sqlite3",
-			"standard",
-			"superglobals",
-			"sybase",
-			"sysvmsg",
-			"sysvsem",
-			"sysvshm",
-			"tidy",
-			"tokenizer",
-			"wddx",
-			"xml",
-			"xmlreader",
-			"xmlrpc",
-			"xmlwriter",
-			"Zend OPcache",
-			"zip",
-			"zlib",
-		},
-		"completion": KeyValue{
-			"insertUseDeclaration":                    true,
-			"fullyQualifyGlobalConstantsAndFunctions": false,
-			"triggerParameterHints":                   true,
-			"maxItems":                                100,
-		},
-		"format": KeyValue{
-			"enable": false,
-		},
-		"environment": KeyValue{
-			"documentRoot": "",
-			"includePaths": []string{},
-		},
-		"runtime":   "",
-		"maxMemory": 0,
-		"telemetry": KeyValue{"enabled": false},
-		"trace": KeyValue{
-			"server": "verbose",
-		},
-	}
-
-	body, _ := json.Marshal(cfg)
+	body, _ := json.Marshal(h.config)
 
 	return []json.RawMessage{body, body}, nil
 }

@@ -88,6 +88,8 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 		var result *KeyValue
 		if languageId == "php" {
 			result = s.sendLSPRequest(s.intelephense, "textDocument/hover", params)
+		} else if languageId == "go" {
+			result = s.sendLSPRequest(s.gopls, "textDocument/hover", params)
 		} else {
 			result = s.sendLSPRequest(s.volar, "textDocument/hover", params)
 		}
@@ -109,6 +111,8 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 		var result *KeyValue
 		if languageId == "php" {
 			result = s.sendLSPRequest(s.intelephense, "textDocument/completion", params)
+		} else if languageId == "go" {
+			result = s.sendLSPRequest(s.gopls, "textDocument/completion", params)
 		} else {
 			result = s.sendLSPRequest(s.volar, "textDocument/completion", params)
 		}
@@ -130,6 +134,8 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 		var result *KeyValue
 		if languageId == "php" {
 			result = s.sendLSPRequest(s.intelephense, "textDocument/definition", params)
+		} else if languageId == "go" {
+			result = s.sendLSPRequest(s.gopls, "textDocument/definition", params)
 		} else {
 			result = s.sendLSPRequest(s.volar, "textDocument/definition", params)
 		}
@@ -222,6 +228,14 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 		Log("Sending diagnostics response")
 		cb <- diagnostics
 		return
+	} else if languageId == "go" {
+		Log("getting diagnostics for %s", fn)
+		s.sendLSPRequest(s.gopls, "textDocument/didOpen", params)
+		diagnostics := s.sendLSPRequest(s.gopls, "textDocument/documentSymbol", KeyValue{"textDocument": KeyValue{"uri": fn}})
+
+		Log("Sending diagnostics response")
+		cb <- diagnostics
+		return
 	}
 
 	cb <- &KeyValue{"result": "ok"}
@@ -287,6 +301,7 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 		// initialize intelephense
 		s.sendLSPRequest(s.intelephense, "initialize", params)
 		s.sendLSPRequest(s.volar, "initialize", params)
+		s.sendLSPRequest(s.gopls, "initialize", params)
 		s.initialized = true
 		s.openFolders[name] = lsp.NewDocumentURI(dir)
 	} else if _, ok := s.openFolders[name]; !ok {
@@ -298,6 +313,7 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 		}
 		s.sendLSPRequest(s.intelephense, "initialize", params)
 		s.sendLSPRequest(s.volar, "initialize", params)
+		s.sendLSPRequest(s.gopls, "initialize", params)
 	}
 
 	//go s.sendLSPRequest(s.intelephense, "didChangeWorkspaceFolders", KeyValue{
@@ -326,12 +342,13 @@ func (s *mateServer) handlePanic(mr mateRequest) {
 	}
 }
 
-func startServer(intelephense, copilot, volar mrChan, port string) {
+func startServer(intelephense, copilot, volar, gopls mrChan, port string) {
 	Log("Running webserver on port: %s", port)
 	server = mateServer{
 		intelephense: intelephense,
 		volar:        volar,
 		copilot:      copilot,
+		gopls:        gopls,
 		initialized:  false,
 		logger: &Logger{
 			IncomingPrefix: "HTTP <-- IDE", OutgoingPrefix: "HTTP --> IDE",
