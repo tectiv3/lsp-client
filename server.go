@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/tectiv3/go-lsp"
-	"go.bug.st/json"
 	"log"
 	"net/http"
 	"runtime/debug"
 	"time"
+
+	"github.com/tectiv3/go-lsp"
+	"go.bug.st/json"
 )
 
 var server mateServer
@@ -113,10 +114,12 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 			result = s.sendLSPRequest(s.intelephense, "textDocument/completion", params)
 		} else if languageId == "go" {
 			result = s.sendLSPRequest(s.gopls, "textDocument/completion", params)
-		} else {
+		} else if languageId == "javascript" || languageId == "typescript" || languageId == "vue" {
 			result = s.sendLSPRequest(s.volar, "textDocument/completion", params)
 		}
-		Log("Sending completion response")
+		if config.EnableLogging {
+			Log("Sending completion response")
+		}
 		cb <- result
 	case "definition":
 		//params := lsp.TextDocumentPositionParams{}
@@ -139,7 +142,9 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 		} else {
 			result = s.sendLSPRequest(s.volar, "textDocument/definition", params)
 		}
-		Log("Sending definition response")
+		if config.EnableLogging {
+			Log("Sending definition response")
+		}
 		cb <- result
 
 	case "initialize":
@@ -155,12 +160,25 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 			return
 		}
 		result := s.sendLSPRequest(s.copilot, "getCompletions", params)
-		Log("Sending copilot completions")
+
+		if config.EnableLogging {
+			Log("Sending copilot completions")
+		}
+		cb <- result
+	case "getCompletionsCycling":
+		params := KeyValue{}
+		result := s.sendLSPRequest(s.copilot, "getCompletionsCycling", params)
+
+		if config.EnableLogging {
+			Log("Sending copilot completions cycling")
+		}
 		cb <- result
 	default:
 		cb <- &KeyValue{"result": "error", "message": "unknown method"}
 	}
-	Log("method: %s %s", mr.Method, "processRequest finished")
+	if config.EnableLogging {
+		Log("method: %s %s", mr.Method, "processRequest finished")
+	}
 }
 
 func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
@@ -213,27 +231,29 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 	}
 
 	go s.sendLSPRequest(s.copilot, "textDocument/didOpen", params)
+
+	var diagnostics *KeyValue
+	var ch mrChan
 	if languageId == "vue" {
+		ch = s.volar
 		s.sendLSPRequest(s.volar, "textDocument/didOpen", params)
-		diagnostics := s.sendLSPRequest(s.volar, "textDocument/documentSymbol", KeyValue{"textDocument": KeyValue{"uri": fn}})
-
-		Log("Sending diagnostics response")
-		cb <- diagnostics
-		return
+		diagnostics = s.sendLSPRequest(s.volar, "textDocument/documentSymbol", KeyValue{
+			"textDocument": KeyValue{"uri": fn},
+		})
 	} else if languageId == "php" {
-		Log("getting diagnostics for %s", fn)
-		s.sendLSPRequest(s.intelephense, "textDocument/didOpen", params)
-		diagnostics := s.sendLSPRequest(s.intelephense, "textDocument/documentSymbol", KeyValue{"textDocument": KeyValue{"uri": fn}})
-
-		Log("Sending diagnostics response")
-		cb <- diagnostics
-		return
+		ch = s.intelephense
 	} else if languageId == "go" {
-		Log("getting diagnostics for %s", fn)
-		s.sendLSPRequest(s.gopls, "textDocument/didOpen", params)
-		diagnostics := s.sendLSPRequest(s.gopls, "textDocument/documentSymbol", KeyValue{"textDocument": KeyValue{"uri": fn}})
+		ch = s.gopls
+	}
+	s.sendLSPRequest(ch, "textDocument/didOpen", params)
+	diagnostics = s.sendLSPRequest(ch, "textDocument/documentSymbol", KeyValue{
+		"textDocument": KeyValue{"uri": fn},
+	})
 
-		Log("Sending diagnostics response")
+	if diagnostics != nil {
+		if config.EnableLogging {
+			Log("Sending diagnostics response")
+		}
 		cb <- diagnostics
 		return
 	}

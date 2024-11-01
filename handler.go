@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
-	lsp "github.com/tectiv3/go-lsp"
-	"github.com/tectiv3/go-lsp/jsonrpc"
-	"go.bug.st/json"
 	"io"
 	"log"
 	"os"
 	"os/exec"
 	"sync"
+
+	lsp "github.com/tectiv3/go-lsp"
+	"github.com/tectiv3/go-lsp/jsonrpc"
+	"go.bug.st/json"
 )
 
 type handler struct {
@@ -56,7 +57,7 @@ func (h handler) WindowShowMessage(logger jsonrpc.FunctionLogger, params *lsp.Sh
 
 // WindowLogMessage
 func (h handler) WindowLogMessage(logger jsonrpc.FunctionLogger, params *lsp.LogMessageParams) {
-	logger.Logf("WindowLogMessage: %v", params)
+	logger.Logf("%v", params)
 }
 
 // TelemetryEvent

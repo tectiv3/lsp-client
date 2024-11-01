@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"log"
+	"path/filepath"
+
 	"github.com/tectiv3/go-lsp"
 	"github.com/tectiv3/go-lsp/jsonrpc"
 	"go.bug.st/json"
-	"log"
-	"path/filepath"
 )
 
 var cClient *handler
+var lastCompletionItems []Completion
+var lastCompletionIndex int
 
 func startCopilot(in mrChan) {
 	cClient = startRPCServer("copilot", config.NodePath, config.CopilotPath, "--stdio")
@@ -19,7 +22,9 @@ func startCopilot(in mrChan) {
 		HiColor: hiGreenString, LoColor: greenString, ErrorColor: errorString,
 	})
 	cClient.lsc.RegisterCustomNotification("statusNotification", func(logger jsonrpc.FunctionLogger, params json.RawMessage) {
-		logger.Logf("statusNotification %s", string(params))
+		if config.EnableLogging {
+			logger.Logf("%s", string(params))
+		}
 	})
 
 	go cClient.lsc.Run()
@@ -36,7 +41,9 @@ func (c *handler) processCopilotRequests(in mrChan) {
 	conn := lsc.GetConnection()
 	for {
 		request := <-in
-		Log("LSC <-- IDE %s %s %db", "request", request.Method, len(string(request.Body)))
+		if config.EnableLogging {
+			Log("LSC <-- IDE %s %s %db", "request", request.Method, len(string(request.Body)))
+		}
 
 		switch request.Method {
 		case "initialize":
@@ -60,6 +67,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 			request.CB <- &KeyValue{"status": res.Status}
 		case "getCompletions":
 			go func() {
+				lastCompletionItems = []Completion{}
 				textDocument := &KeyValue{}
 				if err := json.Unmarshal(request.Body, textDocument); err != nil {
 					request.CB <- &KeyValue{"result": "error", "message": err.Error()}
@@ -96,19 +104,48 @@ func (c *handler) processCopilotRequests(in mrChan) {
 					request.CB <- &KeyValue{"status": "ok", "result": "No completions"}
 					return
 				}
-				completion := result.Completions[0]
+				if len(result.Completions) > 1 {
+					Log("Last completion items: %d", len(result.Completions))
+					lastCompletionItems = result.Completions
+				}
+				lastCompletionIndex = 0
+				completion := result.Completions[lastCompletionIndex]
 				conn.SendNotification("notifyShown", lsp.EncodeMessage(KeyValue{
 					"uuids": []string{completion.UUID},
 				}))
-				request.CB <- &KeyValue{"status": "ok", "result": lsp.EncodeMessage(completion.DisplayText)}
+				request.CB <- &KeyValue{
+					"status": "ok", "result": lsp.EncodeMessage(completion.DisplayText),
+				}
 			}()
 		case "getCompletionsCycling":
-		//
+			go func() {
+				if len(lastCompletionItems) == 0 {
+					request.CB <- &KeyValue{"status": "ok", "result": "No completions"}
+					return
+				}
+				if lastCompletionIndex+1 >= len(lastCompletionItems) {
+					lastCompletionIndex = 0
+				} else {
+					lastCompletionIndex++
+				}
+				if lastCompletionIndex < 0 || lastCompletionIndex >= len(lastCompletionItems) {
+					request.CB <- &KeyValue{"status": "ok", "result": "No completions"}
+					return
+				}
+				completion := lastCompletionItems[lastCompletionIndex]
+				conn.SendNotification("notifyShown", lsp.EncodeMessage(KeyValue{
+					"uuids": []string{completion.UUID},
+				}))
+				request.CB <- &KeyValue{
+					"status": "ok", "result": lsp.EncodeMessage(completion.DisplayText),
+				}
+			}()
 		case "notifyCompletionAccepted":
 		//h.client.GetConnection().SendNotification("notifyAccepted", lsp.EncodeMessage(KeyValue{}))
 		case "notifyCompletionRejected":
 		//h.client.GetConnection().SendNotification("notifyRejected", lsp.EncodeMessage(KeyValue{}))
 		case "textDocument/didOpen":
+			lastCompletionItems = []Completion{}
 			textDocument := &KeyValue{}
 			if err := json.Unmarshal(request.Body, textDocument); err != nil {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
@@ -123,6 +160,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 			}})
 			request.CB <- &KeyValue{"status": "ok"}
 		case "textDocument/didClose":
+			lastCompletionItems = []Completion{}
 			textDocument := lsp.TextDocumentIdentifier{}
 			if err := json.Unmarshal(request.Body, &textDocument); err != nil {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}

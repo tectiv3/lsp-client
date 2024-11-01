@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"go.bug.st/json"
 	"io"
 	"log"
 	"os"
 	"runtime/debug"
+
+	"go.bug.st/json"
 )
 
 // NewReadWriteCloser create an io.ReadWriteCloser from given io.ReadCloser and io.WriteCloser.
@@ -40,14 +41,6 @@ func catchAndLogPanic(callback func()) {
 
 		go callback()
 	}
-}
-
-func Log(format string, a ...interface{}) {
-	logger.Logf(format, a...)
-}
-
-func LogError(err error) {
-	logger.Logf(errorString("Error: %v", err))
 }
 
 func readConfig() {

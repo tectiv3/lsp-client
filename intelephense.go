@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	"github.com/tectiv3/go-lsp"
-	"github.com/tectiv3/go-lsp/jsonrpc"
-	"go.bug.st/json"
 	"log"
 	"os"
 	"time"
+
+	"github.com/tectiv3/go-lsp"
+	"github.com/tectiv3/go-lsp/jsonrpc"
+	"go.bug.st/json"
 )
 
 var iClient *handler
@@ -174,7 +175,9 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 
 	for {
 		request := <-in
-		Log("LSI <-- IDE %s %s %db", "request", request.Method, len(string(request.Body)))
+		if config.EnableLogging {
+			Log("LSI <-- IDE %s %s %db", "request", request.Method, len(string(request.Body)))
+		}
 
 		switch request.Method {
 		case "initialize":
@@ -296,7 +299,9 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 			lsc.GetConnection().SendRequest(ctx, request.Method, request.Body)
 
 			go func() {
-				Log("Waiting for diagnostics")
+				if config.EnableLogging {
+					Log("Waiting for diagnostics")
+				}
 				c.Lock()
 				c.waitingForDiagnostics = true
 				c.Unlock()

@@ -18,6 +18,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -34,17 +36,21 @@ type Logger struct {
 }
 
 func init() {
-	log.SetFlags(log.Lmicroseconds)
+	log.SetFlags(log.LstdFlags)
 }
 
 // LogOutgoingRequest prints an outgoing request into the log
 func (l *Logger) LogOutgoingRequest(id string, method string, params json.RawMessage) {
-	log.Print(l.HiColor("%s REQU %s %s %s", l.OutgoingPrefix, method, id, string(params)))
+	if config.EnableLogging {
+		log.Print(l.decorate(l.HiColor("%s REQU %s %s %s", l.OutgoingPrefix, method, id, string(params))))
+	}
 }
 
 // LogOutgoingCancelRequest prints an outgoing cancel request into the log
 func (l *Logger) LogOutgoingCancelRequest(id string) {
-	log.Print(l.LoColor("%s CANCEL %s", l.OutgoingPrefix, id))
+	if config.EnableLogging {
+		log.Print(l.LoColor("%s CANCEL %s", l.OutgoingPrefix, id))
+	}
 }
 
 // LogIncomingResponse prints an incoming response into the log if there is no error
@@ -55,18 +61,26 @@ func (l *Logger) LogIncomingResponse(id string, method string, resp json.RawMess
 	} else {
 		e = string(resp)
 	}
-	log.Print(l.LoColor("%s RESP %s %s %s", l.IncomingPrefix, method, id, e))
+	if config.EnableLogging {
+		log.Print(l.decorate(l.LoColor("%s RESP %s %s %s", l.IncomingPrefix, method, id, e)))
+	}
 }
 
 // LogOutgoingNotification prints an outgoing notification into the log
 func (l *Logger) LogOutgoingNotification(method string, params json.RawMessage) {
-	log.Print(l.HiColor("%s NOTIF %s", l.OutgoingPrefix, method))
+	if config.EnableLogging {
+		log.Print(l.decorate(l.HiColor("%s NOTIF %s", l.OutgoingPrefix, method)))
+	}
 }
 
 // LogIncomingRequest prints an incoming request into the log
 func (l *Logger) LogIncomingRequest(id string, method string, params json.RawMessage) jsonrpc.FunctionLogger {
 	spaces := "                                               "
-	log.Print(l.HiColor(fmt.Sprintf("%s REQU %s %s", l.IncomingPrefix, method, id)))
+
+	if config.EnableLogging {
+		log.Print(l.decorate(l.HiColor(fmt.Sprintf("%s REQU %s %s", l.IncomingPrefix, method, id))))
+	}
+
 	return &FunctionLogger{
 		colorFunc: l.HiColor,
 		prefix:    fmt.Sprintf("%s      %s %s", spaces[:len(l.IncomingPrefix)], method, id),
@@ -75,7 +89,9 @@ func (l *Logger) LogIncomingRequest(id string, method string, params json.RawMes
 
 // LogIncomingCancelRequest prints an incoming cancel request into the log
 func (l *Logger) LogIncomingCancelRequest(id string) {
-	log.Print(l.LoColor("%s CANCEL %s", l.IncomingPrefix, id))
+	if config.EnableLogging {
+		log.Print(l.LoColor("%s CANCEL %s", l.IncomingPrefix, id))
+	}
 }
 
 // LogOutgoingResponse prints an outgoing response into the log if there is no error
@@ -84,13 +100,14 @@ func (l *Logger) LogOutgoingResponse(id string, method string, resp json.RawMess
 	if respErr != nil {
 		e = l.ErrorColor(" ERROR: %s", respErr.AsError())
 	}
-	log.Print(l.LoColor("%s RESP %s %s %s", l.OutgoingPrefix, method, id, e))
+	if config.EnableLogging {
+		log.Print(l.decorate(l.LoColor("%s RESP %s %s %s", l.OutgoingPrefix, method, id, e)))
+	}
 }
 
 // LogIncomingNotification prints an incoming notification into the log
 func (l *Logger) LogIncomingNotification(method string, params json.RawMessage) jsonrpc.FunctionLogger {
 	spaces := "                                               "
-	log.Print(l.HiColor(fmt.Sprintf("%s NOTIF %s", l.IncomingPrefix, method)))
 	return &FunctionLogger{
 		colorFunc: l.HiColor,
 		prefix:    fmt.Sprintf("%s       %s", spaces[:len(l.IncomingPrefix)], method),
@@ -105,6 +122,26 @@ func (l *Logger) LogIncomingDataDelay(delay time.Duration) {
 // LogOutgoingDataDelay prints the delay of outgoing data into the log
 func (l *Logger) LogOutgoingDataDelay(delay time.Duration) {
 	//log.Printf("OUT Elapsed: %v", delay)
+}
+
+func (l *Logger) decorate(format string) string {
+	file_info := ""
+	pc, file, line, ok := runtime.Caller(2)
+	if ok {
+		// Get caller function name.
+		fn := runtime.FuncForPC(pc)
+		var fnName string
+		if fn == nil {
+			fnName = "?()"
+		} else {
+			fnName = strings.TrimLeft(filepath.Ext(fn.Name()), ".")
+		}
+		fileName := filepath.Join(filepath.Base(filepath.Dir(file)), filepath.Base(file))
+
+		file_info = fmt.Sprintf("[%s:%d %s] ", fileName, line, fnName)
+	}
+
+	return file_info + format
 }
 
 // FunctionLogger is a lsp function logger
@@ -164,9 +201,37 @@ const (
 	Reset int = iota
 )
 
+func Log(format string, a ...interface{}) {
+	logger.Logf(format, a...)
+}
+
+func LogError(err error) {
+	logger.Logf(errorString("Error: %v", err))
+}
+
 // Logf logs the given message
 func (l *FunctionLogger) Logf(format string, a ...interface{}) {
-	log.Print(l.colorFunc(l.prefix+": "+format, a...))
+	log.Print(l.decorate(l.colorFunc(l.prefix+": "+format, a...)))
+}
+
+func (l *FunctionLogger) decorate(format string) string {
+	file_info := ""
+	pc, file, line, ok := runtime.Caller(3)
+	if ok {
+		// Get caller function name.
+		fn := runtime.FuncForPC(pc)
+		var fnName string
+		if fn == nil {
+			fnName = "?()"
+		} else {
+			fnName = strings.TrimLeft(filepath.Ext(fn.Name()), ".")
+		}
+		fileName := filepath.Join(filepath.Base(filepath.Dir(file)), filepath.Base(file))
+
+		file_info = fmt.Sprintf("[%s:%d %s] ", fileName, line, fnName)
+	}
+
+	return file_info + format
 }
 
 func c_format(colors ...int) string {
