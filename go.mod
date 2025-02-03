@@ -11,5 +11,4 @@ require (
 
 require (
 	github.com/arduino/go-paths-helper v1.12.1 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 )

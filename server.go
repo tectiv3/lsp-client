@@ -236,10 +236,6 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 	var ch mrChan
 	if languageId == "vue" {
 		ch = s.volar
-		s.sendLSPRequest(s.volar, "textDocument/didOpen", params)
-		diagnostics = s.sendLSPRequest(s.volar, "textDocument/documentSymbol", KeyValue{
-			"textDocument": KeyValue{"uri": fn},
-		})
 	} else if languageId == "php" {
 		ch = s.intelephense
 	} else if languageId == "go" {

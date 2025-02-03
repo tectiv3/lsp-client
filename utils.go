@@ -37,7 +37,7 @@ func LogReadWriteCloserAs(upstream io.ReadWriteCloser, filename string) io.ReadW
 func catchAndLogPanic(callback func()) {
 	if r := recover(); r != nil {
 		reason := fmt.Sprintf("%v", r)
-		LogError(fmt.Errorf("Panic: %s\n\n%s", reason, string(debug.Stack())))
+		LogError(fmt.Errorf("panic: %s\n\n%s", reason, string(debug.Stack())))
 
 		go callback()
 	}

@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	"github.com/tectiv3/go-lsp"
-	"github.com/tectiv3/go-lsp/jsonrpc"
-	"go.bug.st/json"
 	"log"
 	"os"
 	"time"
+
+	"github.com/tectiv3/go-lsp"
+	"github.com/tectiv3/go-lsp/jsonrpc"
+	"go.bug.st/json"
 )
 
 var vClient *handler
@@ -232,6 +233,7 @@ func (c *handler) processVolarRequests(in mrChan) {
 				log.Println("respErr: ", respErr)
 				LogError(err)
 				request.CB <- &KeyValue{"status": "error", "error": "initialize error"}
+				cancel()
 				continue
 			}
 			cancel()

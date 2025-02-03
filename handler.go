@@ -21,52 +21,52 @@ type handler struct {
 	sync.Mutex
 }
 
-func (h handler) SetConfig(config KeyValue) {
+func (h *handler) SetConfig(config KeyValue) {
 	h.config = config
 }
 
-func (h handler) GetDiagnosticChannel() chan *lsp.PublishDiagnosticsParams {
+func (h *handler) GetDiagnosticChannel() chan *lsp.PublishDiagnosticsParams {
 	return h.Diagnostics
 }
 
-func (h handler) ClientRegisterCapability(context.Context, jsonrpc.FunctionLogger, *lsp.RegistrationParams) *jsonrpc.ResponseError {
+func (h *handler) ClientRegisterCapability(context.Context, jsonrpc.FunctionLogger, *lsp.RegistrationParams) *jsonrpc.ResponseError {
 	//Log("ClientRegisterCapability")
 	//h.client.GetConnection().SendNotification("client/registerCapability", lsp.EncodeMessage(KeyValue{}))
 	return nil
 }
 
 // ClientUnregisterCapability
-func (h handler) ClientUnregisterCapability(context.Context, jsonrpc.FunctionLogger, *lsp.UnregistrationParams) *jsonrpc.ResponseError {
+func (h *handler) ClientUnregisterCapability(context.Context, jsonrpc.FunctionLogger, *lsp.UnregistrationParams) *jsonrpc.ResponseError {
 	return nil
 }
 
 // LogTrace
-func (h handler) LogTrace(logger jsonrpc.FunctionLogger, params *lsp.LogTraceParams) {
+func (h *handler) LogTrace(logger jsonrpc.FunctionLogger, params *lsp.LogTraceParams) {
 	log.Printf("LogTrace: %v", params)
 }
 
 // Progress
-func (h handler) Progress(logger jsonrpc.FunctionLogger, params *lsp.ProgressParams) {
+func (h *handler) Progress(logger jsonrpc.FunctionLogger, params *lsp.ProgressParams) {
 	log.Printf("Progress: %v", params)
 }
 
 // WindowShowMessage
-func (h handler) WindowShowMessage(logger jsonrpc.FunctionLogger, params *lsp.ShowMessageParams) {
+func (h *handler) WindowShowMessage(logger jsonrpc.FunctionLogger, params *lsp.ShowMessageParams) {
 	log.Printf("WindowShowMessage: %v", params)
 }
 
 // WindowLogMessage
-func (h handler) WindowLogMessage(logger jsonrpc.FunctionLogger, params *lsp.LogMessageParams) {
+func (h *handler) WindowLogMessage(logger jsonrpc.FunctionLogger, params *lsp.LogMessageParams) {
 	logger.Logf("%v", params)
 }
 
 // TelemetryEvent
-func (h handler) TelemetryEvent(logger jsonrpc.FunctionLogger, msg json.RawMessage) {
+func (h *handler) TelemetryEvent(logger jsonrpc.FunctionLogger, msg json.RawMessage) {
 	log.Printf("TelemetryEvent: %v", msg)
 }
 
 // TextDocumentPublishDiagnostics
-func (h handler) TextDocumentPublishDiagnostics(logger jsonrpc.FunctionLogger, params *lsp.PublishDiagnosticsParams) {
+func (h *handler) TextDocumentPublishDiagnostics(logger jsonrpc.FunctionLogger, params *lsp.PublishDiagnosticsParams) {
 	go func() {
 		h.Lock()
 		defer h.Unlock()
@@ -83,22 +83,22 @@ func (h handler) TextDocumentPublishDiagnostics(logger jsonrpc.FunctionLogger, p
 }
 
 // WindowShowMessageRequest
-func (h handler) WindowShowMessageRequest(context.Context, jsonrpc.FunctionLogger, *lsp.ShowMessageRequestParams) (*lsp.MessageActionItem, *jsonrpc.ResponseError) {
+func (h *handler) WindowShowMessageRequest(context.Context, jsonrpc.FunctionLogger, *lsp.ShowMessageRequestParams) (*lsp.MessageActionItem, *jsonrpc.ResponseError) {
 	return nil, nil
 }
 
 // WindowShowDocument
-func (h handler) WindowShowDocument(context.Context, jsonrpc.FunctionLogger, *lsp.ShowDocumentParams) (*lsp.ShowDocumentResult, *jsonrpc.ResponseError) {
+func (h *handler) WindowShowDocument(context.Context, jsonrpc.FunctionLogger, *lsp.ShowDocumentParams) (*lsp.ShowDocumentResult, *jsonrpc.ResponseError) {
 	return nil, nil
 }
 
 // WindowWorkDoneProgressCreate
-func (h handler) WindowWorkDoneProgressCreate(context.Context, jsonrpc.FunctionLogger, *lsp.WorkDoneProgressCreateParams) *jsonrpc.ResponseError {
+func (h *handler) WindowWorkDoneProgressCreate(context.Context, jsonrpc.FunctionLogger, *lsp.WorkDoneProgressCreateParams) *jsonrpc.ResponseError {
 	return nil
 }
 
 // WorkspaceWorkspaceFolders
-func (h handler) WorkspaceWorkspaceFolders(context.Context, jsonrpc.FunctionLogger) ([]lsp.WorkspaceFolder, *jsonrpc.ResponseError) {
+func (h *handler) WorkspaceWorkspaceFolders(context.Context, jsonrpc.FunctionLogger) ([]lsp.WorkspaceFolder, *jsonrpc.ResponseError) {
 	folders := []lsp.WorkspaceFolder{}
 	// go over server openFolders and append to folders
 	for name, folder := range server.openFolders {
@@ -112,19 +112,19 @@ func (h handler) WorkspaceWorkspaceFolders(context.Context, jsonrpc.FunctionLogg
 }
 
 // WorkspaceConfiguration
-func (h handler) WorkspaceConfiguration(context.Context, jsonrpc.FunctionLogger, *lsp.ConfigurationParams) ([]json.RawMessage, *jsonrpc.ResponseError) {
+func (h *handler) WorkspaceConfiguration(context.Context, jsonrpc.FunctionLogger, *lsp.ConfigurationParams) ([]json.RawMessage, *jsonrpc.ResponseError) {
 	body, _ := json.Marshal(h.config)
 
 	return []json.RawMessage{body, body}, nil
 }
 
 // WorkspaceApplyEdit
-func (h handler) WorkspaceApplyEdit(context.Context, jsonrpc.FunctionLogger, *lsp.ApplyWorkspaceEditParams) (*lsp.ApplyWorkspaceEditResult, *jsonrpc.ResponseError) {
+func (h *handler) WorkspaceApplyEdit(context.Context, jsonrpc.FunctionLogger, *lsp.ApplyWorkspaceEditParams) (*lsp.ApplyWorkspaceEditResult, *jsonrpc.ResponseError) {
 	return nil, nil
 }
 
 // WorkspaceCodeLensRefresh
-func (h handler) WorkspaceCodeLensRefresh(context.Context, jsonrpc.FunctionLogger) *jsonrpc.ResponseError {
+func (h *handler) WorkspaceCodeLensRefresh(context.Context, jsonrpc.FunctionLogger) *jsonrpc.ResponseError {
 	return nil
 }
 
