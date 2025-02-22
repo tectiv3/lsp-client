@@ -10,7 +10,13 @@ var logger = NewLSPFunctionLogger(hiMagentaString, "App")
 var config Config
 
 func main() {
-	readConfig()
+	// check for first argument, if it is present - use it as config path
+	if len(os.Args) > 1 {
+		configPath := os.Args[1]
+		readConfig(configPath)
+	} else {
+		readConfig("")
+	}
 	// start copilot LS
 	copilotChan := make(mrChan, 2)
 	go startCopilot(copilotChan)

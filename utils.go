@@ -43,8 +43,11 @@ func catchAndLogPanic(callback func()) {
 	}
 }
 
-func readConfig() {
-	f, err := os.Open("config.json")
+func readConfig(configPath string) {
+	if len(configPath) == 0 {
+		configPath = "config.json"
+	}
+	f, err := os.Open(configPath)
 	if err != nil {
 		panic(err)
 	}
