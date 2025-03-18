@@ -5,8 +5,10 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"runtime/debug"
 
+	lsp "github.com/tectiv3/go-lsp"
 	"go.bug.st/json"
 )
 
@@ -57,5 +59,48 @@ func readConfig(configPath string) {
 	err = decoder.Decode(&config)
 	if err != nil {
 		panic(err)
+	}
+}
+
+func applyTextmateMarks(uuid string, diagnostics *lsp.PublishDiagnosticsParams) {
+	// Clear all marks first
+	args := []string{"--uuid", uuid, "--clear-mark=note", "--clear-mark=warning", "--clear-mark=error"}
+	cmd := exec.Command(config.MatePath, args...)
+	stdoutStderr, err := cmd.CombinedOutput()
+	if err != nil {
+		LogError(err)
+	}
+	if config.EnableLogging {
+		Log("Cleared marks: %s", stdoutStderr)
+	}
+
+	// Process each diagnostic
+	for _, diag := range diagnostics.Diagnostics {
+		// Check if range start is valid
+		if diag.Range.Start.Line >= 0 {
+			// Convert to 1-based indexing
+			lineno := diag.Range.Start.Line + 1
+			column := diag.Range.Start.Character + 1
+
+			// Get appropriate icon based on severity
+			icon := "error" // Default
+			switch diag.Severity {
+			case 4:
+				icon = "note"
+			case 3:
+				icon = "warning"
+			}
+			lineArg := fmt.Sprintf("--line=%d:%d", lineno, column)
+			markArg := fmt.Sprintf("--set-mark=%s:%s", icon, diag.Message)
+			markArgs := []string{"--uuid", uuid, lineArg, markArg}
+			cmd = exec.Command(config.MatePath, markArgs...)
+			stdoutStderr, err = cmd.CombinedOutput()
+			if err != nil {
+				LogError(err)
+			}
+			if config.EnableLogging {
+				Log("Marked: %s", stdoutStderr)
+			}
+		}
 	}
 }

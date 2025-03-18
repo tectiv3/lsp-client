@@ -207,21 +207,19 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 					} else {
 						panic("whaaaat")
 					}
-
 				}
 			} else {
 				folders = append(folders, lsp.WorkspaceFolder{
 					URI:  lsp.NewDocumentURI(dir),
 					Name: name,
 				})
-
 			}
 
 			ctxC, cancel := context.WithTimeout(ctx, time.Second)
 			_, respErr, err := lsc.Initialize(ctxC, &lsp.InitializeParams{
 				ProcessID: &pid,
-				//RootURI:   lsp.NewDocumentURI(dir),
-				//RootPath:  dir,
+				// RootURI:   lsp.NewDocumentURI(dir),
+				// RootPath:  dir,
 				InitializationOptions: lsp.KeyValue{
 					"storagePath": storage, "clearCache": true,
 					"licenceKey": license, "isVscode": true,
@@ -253,7 +251,7 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 				continue
 			}
 			response, respErr, err := lsc.TextDocumentHover(ctx, &lsp.HoverParams{TextDocumentPositionParams: params})
-			//response, respErr, err := lsc.GetConnection().SendRequest(ctx, "textDocument/hover", request.Body)
+			// response, respErr, err := lsc.GetConnection().SendRequest(ctx, "textDocument/hover", request.Body)
 			if respErr != nil || err != nil {
 				log.Println("respErr: ", respErr)
 				LogError(err)
@@ -298,6 +296,15 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 		case "textDocument/documentSymbol":
 			lsc.GetConnection().SendRequest(ctx, request.Method, request.Body)
 
+			var params KeyValue
+			if err := json.Unmarshal(request.Body, &params); err != nil {
+				LogError(err)
+			}
+			uuid := params.string("uuid", "")
+			if len(uuid) != 0 {
+				request.CB <- &KeyValue{"status": "ok"}
+			}
+
 			go func() {
 				if config.EnableLogging {
 					Log("Waiting for diagnostics")
@@ -310,7 +317,12 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 				c.Lock()
 				c.waitingForDiagnostics = false
 				c.Unlock()
-				request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
+
+				if len(config.MatePath) != 0 {
+					applyTextmateMarks(uuid, diagnostics)
+				} else {
+					request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
+				}
 			}()
 		case "textDocument/didOpen":
 			textDocument := &KeyValue{}

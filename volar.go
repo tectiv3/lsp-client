@@ -292,8 +292,19 @@ func (c *handler) processVolarRequests(in mrChan) {
 		case "textDocument/documentSymbol":
 			lsc.GetConnection().SendRequest(ctx, request.Method, request.Body)
 
+			var params KeyValue
+			if err := json.Unmarshal(request.Body, &params); err != nil {
+				LogError(err)
+			}
+			uuid := params.string("uuid", "")
+			if len(uuid) != 0 {
+				request.CB <- &KeyValue{"status": "ok"}
+			}
+
 			go func() {
-				Log("Waiting for diagnostics")
+				if config.EnableLogging {
+					Log("Waiting for diagnostics")
+				}
 				c.Lock()
 				c.waitingForDiagnostics = true
 				c.Unlock()
@@ -302,7 +313,12 @@ func (c *handler) processVolarRequests(in mrChan) {
 				c.Lock()
 				c.waitingForDiagnostics = false
 				c.Unlock()
-				request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
+
+				if len(config.MatePath) != 0 {
+					applyTextmateMarks(uuid, diagnostics)
+				} else {
+					request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
+				}
 			}()
 		case "textDocument/didOpen":
 			textDocument := &KeyValue{}

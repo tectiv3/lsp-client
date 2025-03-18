@@ -17,7 +17,7 @@ func (s *mateServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
-	//Log("method: %s, length: %d %s", r.Method, r.ContentLength, r.URL.Path)
+	// Log("method: %s, length: %d %s", r.Method, r.ContentLength, r.URL.Path)
 
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusNotFound)
@@ -212,7 +212,7 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 	s.openFiles[fn] = time.Now()
 	// sort slice and remove items if there are over 20 of them
 	if len(s.openFiles) > 19 {
-		//Log("openFiles: %v", s.openFiles)
+		// Log("openFiles: %v", s.openFiles)
 		for k, v := range s.openFiles {
 			if time.Since(v).Seconds() > 60 {
 				Log("Removing %s from openFiles", k)
@@ -242,8 +242,10 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 		ch = s.gopls
 	}
 	s.sendLSPRequest(ch, "textDocument/didOpen", params)
+	uuid := params.string("uuid", "")
 	diagnostics = s.sendLSPRequest(ch, "textDocument/documentSymbol", KeyValue{
 		"textDocument": KeyValue{"uri": fn},
+		"uuid":         uuid,
 	})
 
 	if diagnostics != nil {

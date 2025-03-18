@@ -3,13 +3,14 @@ package main
 import (
 	"database/sql/driver"
 	"fmt"
-	"github.com/tectiv3/go-lsp"
-	"github.com/tectiv3/go-lsp/jsonrpc"
-	"go.bug.st/json"
 	"io"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/tectiv3/go-lsp"
+	"github.com/tectiv3/go-lsp/jsonrpc"
+	"go.bug.st/json"
 )
 
 type Config struct {
@@ -21,6 +22,7 @@ type Config struct {
 	IntelephenseLicense string `json:"intelephense_license"`
 	IntelephenseStorage string `json:"intelephense_storage"`
 	TsdkPath            string `json:"tsdk_path"`
+	MatePath            string `json:"mate_path"`
 	Port                string `json:"port"`
 	EnableLogging       bool   `json:"enable_logging"`
 }
@@ -165,8 +167,10 @@ type workSpace struct {
 	uri  string
 }
 
-type kvChan chan *KeyValue
-type mrChan chan *mateRequest
+type (
+	kvChan chan *KeyValue
+	mrChan chan *mateRequest
+)
 
 type dumper struct {
 	upstream io.ReadWriteCloser
