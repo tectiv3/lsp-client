@@ -152,7 +152,7 @@ func startIntelephense(in mrChan) {
 			"server": "verbose",
 		},
 	})
-
+	iClient.Requests = make(map[string]string)
 	iClient.lsc.SetLogger(&Logger{
 		IncomingPrefix: "LSI <-- Intelephense", OutgoingPrefix: "LSI --> Intelephense",
 		HiColor: hiRedString, LoColor: redString, ErrorColor: errorString,
@@ -294,8 +294,6 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 			}
 			request.CB <- &KeyValue{"status": "ok", "result": response}
 		case "textDocument/documentSymbol":
-			lsc.GetConnection().SendRequest(ctx, request.Method, request.Body)
-
 			var params KeyValue
 			if err := json.Unmarshal(request.Body, &params); err != nil {
 				LogError(err)
@@ -304,32 +302,32 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 			if len(uuid) != 0 {
 				request.CB <- &KeyValue{"status": "ok"}
 			}
+			fn := params.string("fn", "")
+			c.Requests[fn] = uuid
 
-			go func() {
-				if config.EnableLogging {
-					Log("Waiting for diagnostics")
-				}
-				c.Lock()
-				c.waitingForDiagnostics = true
-				c.Unlock()
+			lsc.GetConnection().SendRequest(ctx, request.Method, request.Body)
 
-				diagnostics := <-lsc.GetHandler().GetDiagnosticChannel()
-				c.Lock()
-				c.waitingForDiagnostics = false
-				c.Unlock()
+			// go func() {
+			// 	// if config.EnableLogging {
+			// 	Log("Waiting for diagnostics")
+			// 	// }
+			// 	// diagnostics := <-c.Lock()
+			// 	// c.waitingForDiagnostics = false
+			// 	// c.Unlock()
 
-				if len(config.MatePath) != 0 {
-					applyTextmateMarks(uuid, diagnostics)
-				} else {
-					request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
-				}
-			}()
+			// 	if len(config.MatePath) != 0 {
+			// 		applyTextmateMarks(uuid, diagnostics)
+			// 	} else {
+			// 		request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
+			// 	}
+			// }()
 		case "textDocument/didOpen":
 			textDocument := &KeyValue{}
 			if err := json.Unmarshal(request.Body, textDocument); err != nil {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
 				continue
 			}
+			request.CB <- &KeyValue{"status": "ok"}
 			uri, _ := lsp.NewDocumentURIFromURL(textDocument.string("uri", ""))
 			go lsc.TextDocumentDidOpen(&lsp.DidOpenTextDocumentParams{TextDocument: lsp.TextDocumentItem{
 				URI:        uri,
@@ -337,7 +335,6 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 				Version:    textDocument.int("version", 0),
 				Text:       textDocument.string("text", ""),
 			}})
-			request.CB <- &KeyValue{"status": "ok"}
 		case "textDocument/didClose":
 			textDocument := lsp.TextDocumentIdentifier{}
 			if err := json.Unmarshal(request.Body, &textDocument); err != nil {

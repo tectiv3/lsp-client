@@ -202,6 +202,7 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 		return
 	}
 
+	cb <- &KeyValue{"result": "ok"}
 	//if _, ok := s.openFiles[fn]; ok {
 	//Log("file %s already opened", fn)
 	//s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
@@ -232,9 +233,8 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 
 	go s.sendLSPRequest(s.copilot, "textDocument/didOpen", params)
 
-	var diagnostics *KeyValue
 	var ch mrChan
-	if languageId == "vue" {
+	if languageId == "vue" || languageId == "js" || languageId == "ts" || languageId == "tsx" {
 		ch = s.volar
 	} else if languageId == "php" {
 		ch = s.intelephense
@@ -242,21 +242,22 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 		ch = s.gopls
 	}
 	s.sendLSPRequest(ch, "textDocument/didOpen", params)
+
 	uuid := params.string("uuid", "")
-	diagnostics = s.sendLSPRequest(ch, "textDocument/documentSymbol", KeyValue{
+	go s.sendLSPRequest(ch, "textDocument/documentSymbol", KeyValue{
 		"textDocument": KeyValue{"uri": fn},
 		"uuid":         uuid,
+		"fn":           fn,
 	})
+	// if diagnostics != nil {
+	// if config.EnableLogging {
+	// Log("Sending diagnostics response")
+	// }
+	// cb <- diagnostics
+	// return
+	// }
 
-	if diagnostics != nil {
-		if config.EnableLogging {
-			Log("Sending diagnostics response")
-		}
-		cb <- diagnostics
-		return
-	}
-
-	cb <- &KeyValue{"result": "ok"}
+	// cb <- &KeyValue{"result": "ok"}
 }
 
 func (s *mateServer) onDidClose(mr mateRequest, cb kvChan) {

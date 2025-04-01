@@ -15,6 +15,7 @@ import (
 
 type handler struct {
 	lsc                   *lsp.Client
+	Requests              map[string]string
 	Diagnostics           chan *lsp.PublishDiagnosticsParams
 	waitingForDiagnostics bool
 	config                KeyValue
@@ -70,15 +71,18 @@ func (h *handler) TextDocumentPublishDiagnostics(logger jsonrpc.FunctionLogger, 
 	go func() {
 		h.Lock()
 		defer h.Unlock()
-		if !h.waitingForDiagnostics {
+
+		uuid := h.Requests[params.URI.String()]
+		if len(uuid) == 0 {
 			return
 		}
+		applyTextmateMarks(uuid, params)
 		logger.Logf("TextDocumentPublishDiagnostics: %v", params)
-		if params.IsClear {
-			logger.Logf("Clearing diagnostics for %s", params.URI)
-			return
-		}
-		h.Diagnostics <- params
+		// if params.IsClear {
+		// 	logger.Logf("Clearing diagnostics for %s", params.URI)
+		// 	return
+		// }
+		// h.Diagnostics <- params
 	}()
 }
 

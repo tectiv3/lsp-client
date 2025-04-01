@@ -25,6 +25,7 @@ func startGopls(in mrChan) {
 		return
 	}
 	gClient = startRPCServer("gopls", config.GoplsPath, "serve")
+	gClient.Requests = make(map[string]string)
 	gClient.SetConfig(KeyValue{
 		"format": KeyValue{
 			"enable": false,

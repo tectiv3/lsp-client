@@ -73,9 +73,17 @@ func applyTextmateMarks(uuid string, diagnostics *lsp.PublishDiagnosticsParams) 
 	if config.EnableLogging {
 		Log("Cleared marks: %s", stdoutStderr)
 	}
-
+	if config.EnableLogging {
+		if diagnostics.IsClear {
+			Log("No diagnostics to process")
+			return
+		}
+	}
 	// Process each diagnostic
 	for _, diag := range diagnostics.Diagnostics {
+		if config.EnableLogging {
+			Log("Processing diagnostic: %s, Line: %d", diag.Message, diag.Range.Start.Line)
+		}
 		// Check if range start is valid
 		if diag.Range.Start.Line >= 0 {
 			// Convert to 1-based indexing

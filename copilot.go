@@ -17,6 +17,7 @@ var lastCompletionIndex int
 func startCopilot(in mrChan) {
 	cClient = startRPCServer("copilot", config.NodePath, config.CopilotPath, "--stdio")
 
+	cClient.Requests = make(map[string]string)
 	cClient.lsc.SetLogger(&Logger{
 		IncomingPrefix: "LSC <-- Copilot", OutgoingPrefix: "LSC --> Copilot",
 		HiColor: hiGreenString, LoColor: greenString, ErrorColor: errorString,

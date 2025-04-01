@@ -25,6 +25,7 @@ func startVolar(in mrChan) {
 		return
 	}
 	vClient = startRPCServer("volar", config.NodePath, config.VolarPath, "--stdio")
+	vClient.Requests = make(map[string]string)
 	vClient.SetConfig(KeyValue{
 		"files": KeyValue{
 			"maxSize":      300000,
