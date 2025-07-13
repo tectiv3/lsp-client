@@ -65,7 +65,65 @@ func (c *handler) processCopilotRequests(in mrChan) {
 			//        eval_in_emacs("browse-url", result['verificationUri'])
 			//        message_emacs(f'Please enter user-code {result["userCode"]}')
 			//log.Println(res.Status)
-			request.CB <- &KeyValue{"status": res.Status}
+			// If already signed in, return success
+			if res.Status == "AlreadySignedIn" {
+				request.CB <- &KeyValue{"status": "success", "user": res.User, "message": "Already signed in"}
+				return
+			}
+
+			// Return the authentication details for the client to handle
+			request.CB <- &KeyValue{
+				"status":          "pending",
+				"userCode":        res.UserCode,
+				"verificationUri": res.VerificationUri,
+				"expiresIn":       res.ExpiresIn,
+				"interval":        res.Interval,
+			}
+		case "signInConfirm":
+			textDocument := &KeyValue{}
+			if err := json.Unmarshal(request.Body, textDocument); err != nil {
+				request.CB <- &KeyValue{"status": "error", "message": err.Error()}
+				return
+			}
+			userCode := textDocument.string("userCode", "")
+			if userCode == "" {
+				request.CB <- &KeyValue{"status": "error", "message": "userCode is required"}
+				return
+			}
+
+			resp := sendRequest("signInConfirm", KeyValue{"userCode": userCode}, conn, ctx)
+			var res signInConfirmResponse
+			json.Unmarshal(resp, &res)
+
+			if res.Status == "NotAuthorized" {
+				request.CB <- &KeyValue{"status": "error", "message": "Not authorized"}
+				return
+			}
+
+			request.CB <- &KeyValue{"status": "success", "user": res.User}
+		case "checkStatus":
+			resp := sendRequest("checkStatus", KeyValue{}, conn, ctx)
+			var res checkStatusResponse
+			json.Unmarshal(resp, &res)
+
+			if res.Status == "NotAuthorized" {
+				request.CB <- &KeyValue{"status": "error", "message": "Not authorized"}
+				return
+			}
+
+			request.CB <- &KeyValue{"status": "success", "user": res.User}
+		case "authStatus":
+			// Alias for checkStatus
+			resp := sendRequest("checkStatus", KeyValue{}, conn, ctx)
+			var res checkStatusResponse
+			json.Unmarshal(resp, &res)
+
+			if res.Status == "NotAuthorized" {
+				request.CB <- &KeyValue{"status": "error", "message": "Not authorized"}
+				return
+			}
+
+			request.CB <- &KeyValue{"status": "success", "user": res.User}
 		case "getCompletions":
 			go func() {
 				lastCompletionItems = []Completion{}
@@ -142,9 +200,13 @@ func (c *handler) processCopilotRequests(in mrChan) {
 				}
 			}()
 		case "notifyCompletionAccepted":
-		//h.client.GetConnection().SendNotification("notifyAccepted", lsp.EncodeMessage(KeyValue{}))
+			// Send notification to copilot server
+			conn.SendNotification("notifyAccepted", lsp.EncodeMessage(KeyValue{}))
+			request.CB <- &KeyValue{"status": "ok"}
 		case "notifyCompletionRejected":
-		//h.client.GetConnection().SendNotification("notifyRejected", lsp.EncodeMessage(KeyValue{}))
+			// Send notification to copilot server
+			conn.SendNotification("notifyRejected", lsp.EncodeMessage(KeyValue{}))
+			request.CB <- &KeyValue{"status": "ok"}
 		case "textDocument/didOpen":
 			lastCompletionItems = []Completion{}
 			textDocument := &KeyValue{}
