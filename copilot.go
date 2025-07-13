@@ -12,9 +12,11 @@ import (
 	"go.bug.st/json"
 )
 
-var cClient *handler
-var lastCompletionItems []Completion
-var lastCompletionIndex int
+var (
+	cClient             *handler
+	lastCompletionItems []Completion
+	lastCompletionIndex int
+)
 
 func startCopilot(in mrChan) {
 	cClient = startRPCServer("copilot", config.NodePath, config.CopilotPath, "--stdio")
@@ -64,7 +66,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 			sendRequest("initialize", KeyValue{
 				"capabilities": KeyValue{"workspace": KeyValue{"workspaceFolders": true}},
 			}, conn, ctx)
-			//log.Println("After initialize")
+			// log.Println("After initialize")
 			lsc.Initialized(&lsp.InitializedParams{})
 			sendRequest("setEditorInfo", KeyValue{
 				"editorInfo":       KeyValue{"name": "Textmate", "version": "2.0.23"},
@@ -77,7 +79,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 			json.Unmarshal(resp, &res)
 			//        eval_in_emacs("browse-url", result['verificationUri'])
 			//        message_emacs(f'Please enter user-code {result["userCode"]}')
-			//log.Println(res.Status)
+			// log.Println(res.Status)
 			// If already signed in, return success
 			if res.Status == "AlreadySignedIn" {
 				request.CB <- &KeyValue{"status": "success", "user": res.User, "message": "Already signed in"}

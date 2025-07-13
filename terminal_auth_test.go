@@ -102,16 +102,6 @@ func TestCheckStatusResponseParsing(t *testing.T) {
 	}
 }
 
-func TestPromptYesNo(t *testing.T) {
-	// This is a unit test for the promptYesNo function
-	// Note: This function requires user input, so we'll just test it exists
-	// In a real scenario, you might want to mock os.Stdin
-
-	// Just verify the function exists and doesn't panic when called
-	// We can't easily test the interactive part without mocking stdin
-	t.Log("promptYesNo function exists and is callable")
-}
-
 func TestTerminalAuth_openBrowser(t *testing.T) {
 	// Create a TerminalAuth instance
 	mockHandler := &handler{}

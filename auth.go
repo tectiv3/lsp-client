@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 	"time"
 
 	"go.bug.st/json"
@@ -43,6 +42,11 @@ func (ta *TerminalAuth) isAuthenticated() bool {
 	defer cancel()
 
 	conn := ta.client.lsc.GetConnection()
+
+	sendRequest("initialize", KeyValue{
+		"capabilities": KeyValue{"workspace": KeyValue{"workspaceFolders": true}},
+	}, conn, ctx)
+
 	resp := sendRequest("checkStatus", KeyValue{}, conn, ctx)
 
 	var res checkStatusResponse
@@ -51,7 +55,7 @@ func (ta *TerminalAuth) isAuthenticated() bool {
 		return false
 	}
 
-	return res.Status != "NotAuthorized" && res.Status != ""
+	return res.Status != "NotAuthorized" && res.Status != "NotSignedIn" && res.Status != ""
 }
 
 // performTerminalAuth performs the complete authentication flow in terminal
@@ -158,21 +162,4 @@ func (ta *TerminalAuth) PerformAuthWithRetry(maxRetries int) error {
 		return nil
 	}
 	return fmt.Errorf("authentication failed after %d attempts", maxRetries)
-}
-
-// promptYesNo prompts the user for a yes/no response
-func promptYesNo(message string) bool {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Printf("%s (y/n): ", message)
-		response, _ := reader.ReadString('\n')
-		response = strings.ToLower(strings.TrimSpace(response))
-		if response == "y" || response == "yes" {
-			return true
-		}
-		if response == "n" || response == "no" {
-			return false
-		}
-		fmt.Println("Please enter 'y' or 'n'")
-	}
 }
