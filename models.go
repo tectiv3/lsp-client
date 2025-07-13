@@ -32,6 +32,18 @@ type signInResponse struct {
 	User            string `json:"user"`
 	VerificationUri string `json:"verificationUri,omitempty"`
 	UserCode        string `json:"userCode,omitempty"`
+	ExpiresIn       int    `json:"expiresIn,omitempty"`
+	Interval        int    `json:"interval,omitempty"`
+}
+
+type signInConfirmResponse struct {
+	Status string `json:"status"`
+	User   string `json:"user"`
+}
+
+type checkStatusResponse struct {
+	Status string `json:"status"`
+	User   string `json:"user"`
 }
 
 type Completion struct {

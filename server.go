@@ -173,6 +173,36 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 			Log("Sending copilot completions cycling")
 		}
 		cb <- result
+	case "signIn":
+		result := s.sendLSPRequest(s.copilot, "signIn", KeyValue{})
+		if config.EnableLogging {
+			Log("Sending copilot signIn")
+		}
+		cb <- result
+	case "signInConfirm":
+		params := KeyValue{}
+		if err := json.Unmarshal(mr.Body, &params); err != nil {
+			cb <- &KeyValue{"result": "error", "message": err.Error()}
+			return
+		}
+		result := s.sendLSPRequest(s.copilot, "signInConfirm", params)
+		if config.EnableLogging {
+			Log("Sending copilot signInConfirm")
+		}
+		cb <- result
+	case "checkStatus":
+		result := s.sendLSPRequest(s.copilot, "checkStatus", KeyValue{})
+		if config.EnableLogging {
+			Log("Sending copilot checkStatus")
+		}
+		cb <- result
+	case "authStatus":
+		// This is an alias for checkStatus for convenience
+		result := s.sendLSPRequest(s.copilot, "checkStatus", KeyValue{})
+		if config.EnableLogging {
+			Log("Sending copilot authStatus")
+		}
+		cb <- result
 	default:
 		cb <- &KeyValue{"result": "error", "message": "unknown method"}
 	}
@@ -296,7 +326,7 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 			return
 		}
 		s.sendLSPRequest(s.copilot, "initialize", KeyValue{})
-		s.sendLSPRequest(s.copilot, "signIn", KeyValue{})
+		// Authentication is now handled during copilot startup
 	}()
 
 	params := KeyValue{}

@@ -261,6 +261,9 @@ func hiGreenString(format string, a ...interface{}) string {
 func hiMagentaString(format string, a ...interface{}) string {
 	return colorFormat(format, FgHiMagenta, a...)
 }
+func hiYellowString(format string, a ...interface{}) string {
+	return colorFormat(format, FgHiYellow, a...)
+}
 func hiBlueString(format string, a ...interface{}) string {
 	return colorFormat(format, FgHiBlue, a...)
 }
