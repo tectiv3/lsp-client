@@ -23,9 +23,9 @@ func TestAuthEndpoints(t *testing.T) {
 		initialized: true,
 		logger: &Logger{
 			IncomingPrefix: "TEST <-- IDE", OutgoingPrefix: "TEST --> IDE",
-			HiColor:    func(s string, args ...interface{}) string { return s },
-			LoColor:    func(s string, args ...interface{}) string { return s },
-			ErrorColor: func(s string, args ...interface{}) string { return s },
+			HiColor:    func(s string, args ...any) string { return s },
+			LoColor:    func(s string, args ...any) string { return s },
+			ErrorColor: func(s string, args ...any) string { return s },
 		},
 		openFiles:   make(map[string]time.Time),
 		openFolders: make(map[string]lsp.DocumentURI),
@@ -62,7 +62,7 @@ func TestAuthEndpoints(t *testing.T) {
 
 	// Test signIn endpoint
 	t.Run("signIn", func(t *testing.T) {
-		requestBody := map[string]interface{}{
+		requestBody := map[string]any{
 			"Method": "signIn",
 			"Body":   json.RawMessage(`{}`),
 		}
@@ -76,7 +76,7 @@ func TestAuthEndpoints(t *testing.T) {
 			t.Errorf("Expected status 200, got %d", w.Code)
 		}
 
-		var response map[string]interface{}
+		var response map[string]any
 		json.Unmarshal(w.Body.Bytes(), &response)
 
 		if response["status"] != "pending" {
@@ -93,7 +93,7 @@ func TestAuthEndpoints(t *testing.T) {
 		// Create the proper request structure for signInConfirm
 		params := map[string]string{"userCode": "TEST123"}
 		paramsBody, _ := json.Marshal(params)
-		requestBody := map[string]interface{}{
+		requestBody := map[string]any{
 			"Method": "signInConfirm",
 			"Body":   json.RawMessage(paramsBody),
 		}
@@ -107,7 +107,7 @@ func TestAuthEndpoints(t *testing.T) {
 			t.Errorf("Expected status 200, got %d", w.Code)
 		}
 
-		var response map[string]interface{}
+		var response map[string]any
 		json.Unmarshal(w.Body.Bytes(), &response)
 
 		if response["status"] != "success" {
@@ -121,7 +121,7 @@ func TestAuthEndpoints(t *testing.T) {
 
 	// Test checkStatus endpoint
 	t.Run("checkStatus", func(t *testing.T) {
-		requestBody := map[string]interface{}{
+		requestBody := map[string]any{
 			"Method": "checkStatus",
 			"Body":   json.RawMessage(`{}`),
 		}
@@ -135,7 +135,7 @@ func TestAuthEndpoints(t *testing.T) {
 			t.Errorf("Expected status 200, got %d", w.Code)
 		}
 
-		var response map[string]interface{}
+		var response map[string]any
 		json.Unmarshal(w.Body.Bytes(), &response)
 
 		if response["status"] != "success" {
@@ -145,7 +145,7 @@ func TestAuthEndpoints(t *testing.T) {
 
 	// Test authStatus endpoint (alias)
 	t.Run("authStatus", func(t *testing.T) {
-		requestBody := map[string]interface{}{
+		requestBody := map[string]any{
 			"Method": "authStatus",
 			"Body":   json.RawMessage(`{}`),
 		}
@@ -159,7 +159,7 @@ func TestAuthEndpoints(t *testing.T) {
 			t.Errorf("Expected status 200, got %d", w.Code)
 		}
 
-		var response map[string]interface{}
+		var response map[string]any
 		json.Unmarshal(w.Body.Bytes(), &response)
 
 		if response["status"] != "success" {
