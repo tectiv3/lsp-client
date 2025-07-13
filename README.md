@@ -6,7 +6,28 @@ Copilot can work without Intelephense with any supported by copilot language.
 
 ## Authentication
 
-The server supports GitHub Copilot authentication through the following endpoints:
+The server now supports automatic GitHub Copilot authentication during startup with a terminal-based flow.
+
+### Automatic Terminal Authentication
+
+When the server starts, it automatically:
+1. Checks if Copilot is already authenticated
+2. If not authenticated, starts an interactive terminal login flow
+3. Displays a user code and opens GitHub in your browser
+4. Waits for you to complete authentication
+5. Verifies the authentication was successful
+
+The authentication happens automatically when you start the server - no additional setup required!
+
+**Features:**
+- Automatic browser opening (cross-platform)
+- User-friendly terminal interface with colored output
+- Retry mechanism (up to 3 attempts)
+- Graceful fallback if authentication fails
+
+### Manual API Authentication
+
+The server also supports GitHub Copilot authentication through the following API endpoints:
 
 ### Authentication Flow
 

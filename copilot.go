@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"path/filepath"
+	"time"
 
 	"github.com/tectiv3/go-lsp"
 	"github.com/tectiv3/go-lsp/jsonrpc"
@@ -29,6 +31,17 @@ func startCopilot(in mrChan) {
 	})
 
 	go cClient.lsc.Run()
+
+	// Wait a moment for the LSP client to be ready
+	time.Sleep(1 * time.Second)
+
+	// Perform authentication check and terminal login if needed
+	auth := NewTerminalAuth(cClient)
+	if err := auth.PerformAuthWithRetry(3); err != nil {
+		LogError(fmt.Errorf("Copilot authentication failed: %w", err))
+		fmt.Printf("\n" + hiRedString("Warning: Copilot authentication failed. You can try again later using the API.") + "\n\n")
+	}
+
 	go cClient.processCopilotRequests(in)
 }
 

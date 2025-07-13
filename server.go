@@ -326,7 +326,7 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 			return
 		}
 		s.sendLSPRequest(s.copilot, "initialize", KeyValue{})
-		s.sendLSPRequest(s.copilot, "signIn", KeyValue{})
+		// Authentication is now handled during copilot startup
 	}()
 
 	params := KeyValue{}
