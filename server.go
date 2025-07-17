@@ -339,6 +339,7 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 		cb <- &KeyValue{"result": "error", "message": "Empty dir"}
 		return
 	}
+	languageId := params.string("languageId", "")
 
 	name := params.string("name", "unknown")
 	if s.currentWS != nil && s.currentWS.name == name {
@@ -356,11 +357,14 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 	} else if _, ok := s.openFolders[name]; !ok {
 		Log("First time opening workspace %s", name)
 		s.openFolders[name] = lsp.NewDocumentURI(dir)
-		params["folders"] = []KeyValue{}
-		for f, v := range s.openFolders {
-			params["folders"] = append(params["folders"].([]KeyValue), KeyValue{"uri": v, "name": f})
+		if languageId == "php" {
+			params["folders"] = []KeyValue{{"uri": lsp.NewDocumentURI(dir), "name": name}}
+			s.sendLSPRequest(s.intelephense, "initialize", params)
 		}
-		s.sendLSPRequest(s.intelephense, "initialize", params)
+		// params["folders"] = []KeyValue{}
+		// for f, v := range s.openFolders {
+		//     params["folders"] = append(params["folders"].([]KeyValue), KeyValue{"uri": v, "name": f})
+		// }
 		s.sendLSPRequest(s.volar, "initialize", params)
 		s.sendLSPRequest(s.gopls, "initialize", params)
 	}
