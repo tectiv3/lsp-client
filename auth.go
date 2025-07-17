@@ -27,17 +27,17 @@ func (ta *TerminalAuth) CheckAndPerformAuth() error {
 	Log("Checking Copilot authentication status...")
 
 	// First check if already authenticated
-	if ta.isAuthenticated() {
+	if ta.IsAuthenticated() {
 		Log("Already authenticated with GitHub Copilot")
 		return nil
 	}
 
 	Log("Not authenticated. Starting authentication flow...")
-	return ta.performTerminalAuth()
+	return ta.PerformTerminalAuth()
 }
 
-// isAuthenticated checks if the user is currently authenticated
-func (ta *TerminalAuth) isAuthenticated() bool {
+// IsAuthenticated checks if the user is currently authenticated
+func (ta *TerminalAuth) IsAuthenticated() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -58,8 +58,8 @@ func (ta *TerminalAuth) isAuthenticated() bool {
 	return res.Status != "NotAuthorized" && res.Status != "NotSignedIn" && res.Status != ""
 }
 
-// performTerminalAuth performs the complete authentication flow in terminal
-func (ta *TerminalAuth) performTerminalAuth() error {
+// PerformTerminalAuth performs the complete authentication flow in terminal
+func (ta *TerminalAuth) PerformTerminalAuth() error {
 	ctx := context.Background()
 	conn := ta.client.lsc.GetConnection()
 
@@ -122,7 +122,7 @@ func (ta *TerminalAuth) performTerminalAuth() error {
 		return fmt.Errorf("authentication verification failed")
 	}
 
-	fmt.Printf("\n"+hiGreenString("✓ Successfully authenticated as %s")+"\n\n", checkResult.User)
+	fmt.Println("\n" + hiGreenString("✓ Successfully authenticated as %s", checkResult.User))
 	return nil
 }
 

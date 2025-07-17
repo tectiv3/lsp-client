@@ -251,6 +251,10 @@ func (c *handler) processCopilotRequests(in mrChan) {
 }
 
 func sendRequest(method string, request KeyValue, conn *jsonrpc.Connection, ctx context.Context) json.RawMessage {
+	return sendRequestWithAuth(method, request, conn, ctx, true)
+}
+
+func sendRequestWithAuth(method string, request KeyValue, conn *jsonrpc.Connection, ctx context.Context, allowReauth bool) json.RawMessage {
 	body, err := json.Marshal(request)
 	if err != nil {
 		LogError(err)
@@ -261,8 +265,71 @@ func sendRequest(method string, request KeyValue, conn *jsonrpc.Connection, ctx 
 	if err != nil || respErr != nil {
 		log.Println("respErr: ", respErr)
 		LogError(err)
+
+		// Check if this is an authentication error and we're allowed to re-authenticate
+		if allowReauth && respErr != nil && isAuthenticationError(respErr) {
+			Log("Detected authentication error, attempting re-authentication...")
+			if err := handleReauthentication(conn, ctx); err != nil {
+				LogError(fmt.Errorf("re-authentication failed: %w", err))
+				return []byte{}
+			}
+
+			// Retry the original request without allowing further re-authentication
+			Log("Re-authentication successful, retrying original request...")
+			return sendRequestWithAuth(method, request, conn, ctx, false)
+		}
+
 		return []byte{}
 	}
 
 	return resp
+}
+
+// isAuthenticationError checks if the error is related to authentication
+func isAuthenticationError(respErr *jsonrpc.ResponseError) bool {
+	if respErr == nil {
+		return false
+	}
+
+	// Check for authentication error codes and messages
+	return respErr.Code == 1000 ||
+		respErr.Message == "Not authenticated: NotSignedIn" ||
+		respErr.Message == "Not authenticated" ||
+		respErr.Message == "NotSignedIn" ||
+		respErr.Message == "NotAuthorized"
+}
+
+// handleReauthentication performs automatic re-authentication
+func handleReauthentication(conn *jsonrpc.Connection, ctx context.Context) error {
+	Log("Starting automatic re-authentication...")
+
+	// Check if we can create a TerminalAuth instance
+	if cClient == nil {
+		return fmt.Errorf("client not available for re-authentication")
+	}
+
+	// Create a new terminal auth instance
+	auth := NewTerminalAuth(cClient)
+
+	// First try to check if we're already authenticated after a brief delay
+	// This handles cases where the auth token was temporarily invalid
+	time.Sleep(1 * time.Second)
+	if auth.IsAuthenticated() {
+		Log("Authentication recovered automatically")
+		return nil
+	}
+
+	// If still not authenticated, try the full auth flow
+	Log("Performing full re-authentication flow...")
+	if err := auth.PerformTerminalAuth(); err != nil {
+		return fmt.Errorf("terminal authentication failed: %w", err)
+	}
+
+	Log("Re-authentication completed successfully")
+	return nil
+}
+
+// For testing purposes
+func IsAuthenticationError(respErr *jsonrpc.ResponseError) bool {
+	return isAuthenticationError(respErr)
 }
