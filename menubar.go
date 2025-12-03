@@ -44,7 +44,7 @@ func (m *MenuBarApp) Run() {
 }
 
 func (m *MenuBarApp) onReady() {
-	systray.SetTitle("◦")
+	systray.SetTitle("{}")
 	systray.SetTooltip("LSP Client")
 
 	systray.AddSeparator()
