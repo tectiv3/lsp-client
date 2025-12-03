@@ -252,3 +252,38 @@ func (sd *combinedReadWriteCloser) Close() error {
 	}
 	return nil
 }
+
+type ServerStatus string
+
+const (
+	ServerStatusRunning ServerStatus = "running"
+	ServerStatusIdle    ServerStatus = "idle"
+	ServerStatusError   ServerStatus = "error"
+	ServerStatusStopped ServerStatus = "stopped"
+)
+
+type AuthStatus struct {
+	IsAuthenticated bool
+	Username        string
+	Status          string
+	UserCode        string
+	VerificationUri string
+	NeedsAuth       bool
+}
+
+type AppStatus struct {
+	CopilotStatus      ServerStatus
+	IntelephenseStatus ServerStatus
+	GoplsStatus        ServerStatus
+	VolarStatus        ServerStatus
+	HTTPServerStatus   ServerStatus
+	HTTPPort           string
+	Auth               AuthStatus
+	WorkingDirectory   string
+	LastUpdate         time.Time
+}
+
+type StatusUpdate struct {
+	Status AppStatus
+	Error  error
+}

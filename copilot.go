@@ -47,6 +47,35 @@ func startCopilot(in mrChan) {
 	go cClient.processCopilotRequests(in)
 }
 
+func startCopilotWithStatus(in mrChan, readyChan chan *handler) {
+	cClient = startRPCServer("copilot", config.NodePath, config.CopilotPath, "--stdio")
+
+	cClient.Requests = make(map[string]string)
+	cClient.lsc.SetLogger(&Logger{
+		IncomingPrefix: "LSC <-- Copilot", OutgoingPrefix: "LSC --> Copilot",
+		HiColor: hiGreenString, LoColor: greenString, ErrorColor: errorString,
+	})
+	cClient.lsc.RegisterCustomNotification("statusNotification", func(logger jsonrpc.FunctionLogger, params json.RawMessage) {
+		if config.EnableLogging {
+			logger.Logf("%s", string(params))
+		}
+	})
+
+	go cClient.lsc.Run()
+
+	time.Sleep(1 * time.Second)
+
+	readyChan <- cClient
+
+	auth := NewTerminalAuth(cClient)
+	if err := auth.PerformAuthWithRetry(3); err != nil {
+		LogError(fmt.Errorf("Copilot authentication failed: %w", err))
+		fmt.Printf("\n" + hiRedString("Warning: Copilot authentication failed. You can try again later using the API.") + "\n\n")
+	}
+
+	go cClient.processCopilotRequests(in)
+}
+
 func (c *handler) processCopilotRequests(in mrChan) {
 	defer catchAndLogPanic(func() {
 		c.processCopilotRequests(in)

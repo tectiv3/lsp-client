@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime/debug"
 
 	lsp "github.com/tectiv3/go-lsp"
@@ -48,7 +49,21 @@ func catchAndLogPanic(callback func()) {
 func readConfig(configPath string) {
 	if len(configPath) == 0 {
 		configPath = "config.json"
+
+		// If config.json doesn't exist in current directory,
+		// try to find it in the executable's directory
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			exePath, err := os.Executable()
+			if err == nil {
+				exeDir := filepath.Dir(exePath)
+				altPath := filepath.Join(exeDir, "config.json")
+				if _, err := os.Stat(altPath); err == nil {
+					configPath = altPath
+				}
+			}
+		}
 	}
+
 	f, err := os.Open(configPath)
 	if err != nil {
 		panic(err)
