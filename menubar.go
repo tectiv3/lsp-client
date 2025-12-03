@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -27,9 +25,12 @@ type MenuBarApp struct {
 	copilotItem  *systray.MenuItem
 	authCodeItem *systray.MenuItem
 	serversMenu  *systray.MenuItem
-	logsItem     *systray.MenuItem
-	reauthItem   *systray.MenuItem
-	quitItem     *systray.MenuItem
+	// logsItem     *systray.MenuItem
+	workspaceItem  *systray.MenuItem
+	wsStatusItem   *systray.MenuItem
+	wsFoldersItems []*systray.MenuItem
+	reauthItem     *systray.MenuItem
+	quitItem       *systray.MenuItem
 }
 
 func NewMenuBarApp(startedServers []string, authUpdates <-chan struct{}, authHandler *TerminalAuth, cfg *Config) *MenuBarApp {
@@ -51,27 +52,32 @@ func (m *MenuBarApp) onReady() {
 	systray.SetTooltip("LSP Client")
 
 	systray.AddSeparator()
-	m.copilotItem = systray.AddMenuItem("Copilot: Checking...", "GitHub Copilot authentication status")
+	m.copilotItem = systray.AddMenuItem("Copilot: Checking...", "")
 	m.authCodeItem = systray.AddMenuItem("", "")
 	m.authCodeItem.Hide()
 
 	systray.AddSeparator()
-	m.reauthItem = systray.AddMenuItem("Re-authenticate Copilot", "Trigger Copilot re-authentication")
+	m.reauthItem = systray.AddMenuItem("Re-authenticate Copilot", "")
 
 	systray.AddSeparator()
-	m.serversMenu = systray.AddMenuItem("Started Servers", "Language servers launched for this session")
+	m.serversMenu = systray.AddMenuItem("Started Servers", "")
 	m.populateServersMenu()
 
 	systray.AddSeparator()
-	m.logsItem = systray.AddMenuItem("Open Logs", "Open logs directory")
+	m.workspaceItem = systray.AddMenuItem("Workspaces", "")
+	m.wsStatusItem = m.workspaceItem.AddSubMenuItem("Status: Unknown", "")
+	m.wsStatusItem.Disable()
+	// m.workspaceItem.AddSeparator()
+	// m.logsItem = systray.AddMenuItem("Open Logs", "Open logs directory")
 
 	systray.AddSeparator()
-	m.quitItem = systray.AddMenuItem("Quit", "Quit the application")
+	m.quitItem = systray.AddMenuItem("Quit", "")
 
 	go m.handleMenuActions()
 	if m.authUpdates != nil {
 		go m.listenAuthUpdates()
 	}
+	go m.monitorWorkspaceStatus()
 	m.refreshAuthStatusAsync()
 }
 
@@ -90,6 +96,58 @@ func (m *MenuBarApp) listenAuthUpdates() {
 			return
 		}
 	}
+}
+
+func (m *MenuBarApp) monitorWorkspaceStatus() {
+	ticker := time.NewTicker(2 * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			m.updateWorkspaceMenu()
+		case <-m.stopChan:
+			ticker.Stop()
+			return
+		}
+	}
+}
+
+func (m *MenuBarApp) updateWorkspaceMenu() {
+	initialized, folders := server.GetWorkspaceStatus()
+
+	if initialized {
+		m.wsStatusItem.SetTitle("Status: Initialized")
+	} else {
+		m.wsStatusItem.SetTitle("Status: Not Initialized")
+	}
+
+	// Sort folder names
+	names := make([]string, 0, len(folders))
+	for name := range folders {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	// Ensure we have enough menu items
+	for len(m.wsFoldersItems) < len(names) {
+		item := m.workspaceItem.AddSubMenuItem("", "")
+		item.Disable()
+		m.wsFoldersItems = append(m.wsFoldersItems, item)
+	}
+
+	// Update items
+	for i, item := range m.wsFoldersItems {
+		if i < len(names) {
+			name := names[i]
+			uri := folders[name]
+			item.SetTitle(fmt.Sprintf("%s (%s)", name, uri))
+			item.SetTooltip(uri)
+			item.Show()
+		} else {
+			item.Hide()
+		}
+	}
+
+	m.workspaceItem.SetTitle(fmt.Sprintf("Workspaces (%d)", len(names)))
 }
 
 func (m *MenuBarApp) populateServersMenu() {
@@ -134,8 +192,8 @@ func (m *MenuBarApp) handleMenuActions() {
 			Log("Menu bar: Manual re-authentication requested")
 			go m.performReauth()
 
-		case <-m.logsItem.ClickedCh:
-			m.openLogsDirectory()
+		// case <-m.logsItem.ClickedCh:
+		// 	go m.openLogsDirectory()
 
 		case <-m.stopChan:
 			return
@@ -214,6 +272,7 @@ func (m *MenuBarApp) getAuthStatus() AuthStatus {
 	return m.authStatus
 }
 
+/*
 func (m *MenuBarApp) openLogsDirectory() {
 	logsPath := "./logs"
 	absPath, err := filepath.Abs(logsPath)
@@ -228,12 +287,14 @@ func (m *MenuBarApp) openLogsDirectory() {
 	}
 
 	cmd := exec.Command("open", absPath)
-	if err := cmd.Start(); err != nil {
-		Log("Failed to open logs directory: %v", err)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		Log("Failed to open logs directory: %v, output: %s", err, string(out))
 	} else {
 		Log("Opened logs directory: %s", absPath)
 	}
 }
+*/
 
 func (m *MenuBarApp) Quit() {
 	systray.Quit()

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"runtime/debug"
@@ -412,4 +413,14 @@ func startServer(intelephense, copilot, volar, gopls mrChan, port string) {
 	}
 
 	log.Fatal(http.ListenAndServe(":"+port, &server))
+}
+
+func (s *mateServer) GetWorkspaceStatus() (bool, map[string]string) {
+	s.Lock()
+	defer s.Unlock()
+	folders := make(map[string]string)
+	for k, v := range s.openFolders {
+		folders[k] = fmt.Sprint(v)
+	}
+	return s.initialized, folders
 }
