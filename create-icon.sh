@@ -9,11 +9,12 @@ OUTPUT="AppIcon.icns"
 # Create iconset directory
 mkdir -p "$ICON_DIR"
 
-# Create a simple 512x512 PNG with {} text on transparent background
+# Create a 512x512 PNG with black rounded square, white text, transparent corners
 cat > temp_icon.svg <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
-  <text x="256" y="380" font-family="SF Pro Display, Helvetica, Arial" font-size="320" font-weight="300" fill="#000000" text-anchor="middle">{}</text>
+  <rect width="512" height="512" rx="115" ry="115" fill="#1a1a1a"/>
+  <text x="256" y="380" font-family="SF Pro Display, Helvetica, Arial" font-size="320" font-weight="300" fill="#ffffff" text-anchor="middle">{}</text>
 </svg>
 EOF
 

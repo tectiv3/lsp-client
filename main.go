@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 )
@@ -8,7 +9,6 @@ import (
 var logger = NewLSPFunctionLogger(hiMagentaString, "App")
 
 var config Config
-var statusMonitor *StatusMonitor
 var menuBarApp *MenuBarApp
 
 func main() {
@@ -20,41 +20,59 @@ func main() {
 		readConfig("")
 	}
 
-	// Create status channel for menu bar
-	statusChan := make(chan AppStatus, 10)
+	startCopilotTokenMaintenance()
+
+	authStatusUpdates := make(chan struct{}, 1)
+	setAuthStatusUpdateChannel(authStatusUpdates)
+
+	startedServers := []string{}
 
 	// start copilot LS
 	copilotChan := make(mrChan, 2)
 	copilotReadyChan := make(chan *handler, 1)
 	go startCopilotWithStatus(copilotChan, copilotReadyChan)
+	if len(config.CopilotPath) > 0 {
+		startedServers = append(startedServers, "Copilot")
+	}
 
 	// start php intelephense LS
 	intelephenseChan := make(mrChan, 2)
 	go startIntelephense(intelephenseChan)
+	if len(config.IntelephensePath) > 0 {
+		startedServers = append(startedServers, "Intelephense")
+	}
 
 	// start go LS
 	goplsChan := make(mrChan, 2)
 	go startGopls(goplsChan)
+	if len(config.GoplsPath) > 0 {
+		startedServers = append(startedServers, "Gopls")
+	}
 
 	// start vue LS
 	volarChan := make(mrChan, 2)
 	go startVolar(volarChan)
+	if len(config.VolarPath) > 0 {
+		startedServers = append(startedServers, "Volar")
+	}
 
 	// start webserver
 	go startServer(intelephenseChan, copilotChan, volarChan, goplsChan, config.Port)
+	if config.Port != "" {
+		startedServers = append(startedServers, fmt.Sprintf("HTTP Server (:%s)", config.Port))
+	} else {
+		startedServers = append(startedServers, "HTTP Server")
+	}
 
 	// Create ready channel to synchronize menu bar initialization
 	menuBarReadyChan := make(chan struct{})
 
-	// Wait for Copilot to be ready, then initialize status monitor and menu bar
+	// Wait for Copilot to be ready, then initialize menu bar
 	go func() {
 		copilotHandler := <-copilotReadyChan
 		auth := NewTerminalAuth(copilotHandler)
 
-		statusMonitor = NewStatusMonitor(statusChan, copilotHandler, auth, &config)
-		statusMonitor.Start()
-
-		menuBarApp = NewMenuBarApp(statusChan, auth, &config)
+		menuBarApp = NewMenuBarApp(startedServers, authStatusUpdates, auth, &config)
 		close(menuBarReadyChan)
 	}()
 

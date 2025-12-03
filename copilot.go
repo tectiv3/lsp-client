@@ -298,7 +298,9 @@ func sendRequestWithAuth(method string, request KeyValue, conn *jsonrpc.Connecti
 		// Check if this is an authentication error and we're allowed to re-authenticate
 		if allowReauth && respErr != nil && isAuthenticationError(respErr) {
 			Log("Detected authentication error, attempting re-authentication...")
+			notifyAuthStatusChanged()
 			if err := handleReauthentication(conn, ctx); err != nil {
+				notifyAuthStatusChanged()
 				LogError(fmt.Errorf("re-authentication failed: %w", err))
 				return []byte{}
 			}
@@ -345,6 +347,7 @@ func handleReauthentication(conn *jsonrpc.Connection, ctx context.Context) error
 	time.Sleep(1 * time.Second)
 	if auth.IsAuthenticated() {
 		Log("Authentication recovered automatically")
+		notifyAuthStatusChanged()
 		return nil
 	}
 
@@ -354,6 +357,7 @@ func handleReauthentication(conn *jsonrpc.Connection, ctx context.Context) error
 		return fmt.Errorf("terminal authentication failed: %w", err)
 	}
 
+	notifyAuthStatusChanged()
 	Log("Re-authentication completed successfully")
 	return nil
 }
