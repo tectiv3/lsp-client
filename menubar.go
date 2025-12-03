@@ -19,6 +19,7 @@ type MenuBarApp struct {
 	authUpdates    <-chan struct{}
 
 	stopChan chan struct{}
+	stopOnce sync.Once
 
 	mu         sync.RWMutex
 	authStatus AuthStatus
@@ -75,7 +76,9 @@ func (m *MenuBarApp) onReady() {
 }
 
 func (m *MenuBarApp) onExit() {
-	close(m.stopChan)
+	m.stopOnce.Do(func() {
+		close(m.stopChan)
+	})
 }
 
 func (m *MenuBarApp) listenAuthUpdates() {
@@ -147,12 +150,25 @@ func (m *MenuBarApp) performReauth() {
 
 	m.reauthItem.SetTitle("Authenticating...")
 	m.reauthItem.Disable()
-	if err := m.authHandler.PerformTerminalAuth(); err != nil {
+
+	resp, err := m.authHandler.InitiateAuth()
+	if err != nil {
 		Log("Re-authentication failed: %v", err)
 		m.reauthItem.SetTitle("Re-authenticate Copilot (Failed)")
 	} else {
+		if resp.Status == "AlreadySignedIn" {
+			Log("Already signed in")
+		} else {
+			if err := m.authHandler.openBrowser(resp.VerificationUri); err != nil {
+				Log("Failed to open browser: %v", err)
+			}
+			// Update UI to show code immediately
+			m.authCodeItem.SetTitle(fmt.Sprintf("📋 Click to copy: %s", resp.UserCode))
+			m.authCodeItem.Show()
+		}
 		m.reauthItem.SetTitle("Re-authenticate Copilot")
 	}
+
 	m.reauthItem.Enable()
 	m.refreshAuthStatusAsync()
 }
