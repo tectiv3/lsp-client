@@ -43,8 +43,8 @@ func (s *mateServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// block until result or timeout
 	select {
 	case <-tick:
-		w.WriteHeader(http.StatusGatewayTimeout)
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusGatewayTimeout)
 
 		s.logger.LogOutgoingResponse("", mr.Method, json.RawMessage(`{"result": "error", "message": "time out"}`), nil)
 		json.NewEncoder(w).Encode(KeyValue{"result": "error", "message": "time out"})
@@ -258,6 +258,9 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 				s.sendLSPRequest(s.copilot, "textDocument/didClose", KeyValue{
 					"uri": k,
 				})
+				s.sendLSPRequest(s.gopls, "textDocument/didClose", KeyValue{
+					"uri": k,
+				})
 			}
 		}
 	}
@@ -311,6 +314,9 @@ func (s *mateServer) onDidClose(mr mateRequest, cb kvChan) {
 		"uri": fn,
 	})
 	go s.sendLSPRequest(s.copilot, "textDocument/didClose", KeyValue{
+		"uri": fn,
+	})
+	go s.sendLSPRequest(s.gopls, "textDocument/didClose", KeyValue{
 		"uri": fn,
 	})
 	delete(s.openFiles, fn)

@@ -70,19 +70,14 @@ func (h *handler) TelemetryEvent(logger jsonrpc.FunctionLogger, msg json.RawMess
 func (h *handler) TextDocumentPublishDiagnostics(logger jsonrpc.FunctionLogger, params *lsp.PublishDiagnosticsParams) {
 	go func() {
 		h.Lock()
-		defer h.Unlock()
-
 		uuid := h.Requests[params.URI.String()]
+		h.Unlock()
+
 		if len(uuid) == 0 {
 			return
 		}
 		applyTextmateMarks(uuid, params)
 		logger.Logf("TextDocumentPublishDiagnostics: %v", params)
-		// if params.IsClear {
-		// 	logger.Logf("Clearing diagnostics for %s", params.URI)
-		// 	return
-		// }
-		// h.Diagnostics <- params
 	}()
 }
 
@@ -139,13 +134,13 @@ func startRPCServer(app, name string, args ...string) *handler {
 	cmd := exec.Command(name, args...)
 
 	if cin, err := cmd.StdinPipe(); err != nil {
-		panic("getting clangd stdin: " + err.Error())
+		panic("getting " + app + " stdin: " + err.Error())
 	} else if cout, err := cmd.StdoutPipe(); err != nil {
-		panic("getting clangd stdout: " + err.Error())
+		panic("getting " + app + " stdout: " + err.Error())
 	} else if cerr, err := cmd.StderrPipe(); err != nil {
-		panic("getting clangd stderr: " + err.Error())
+		panic("getting " + app + " stderr: " + err.Error())
 	} else if err := cmd.Start(); err != nil {
-		panic("running clangd: " + err.Error())
+		panic("running " + app + ": " + err.Error())
 	} else {
 		stdin = cin
 		stdout = cout

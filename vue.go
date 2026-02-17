@@ -142,7 +142,7 @@ func (c *handler) processVueRequests(in mrChan) {
 			if respErr != nil || err != nil {
 				log.Println("respErr: ", respErr)
 				LogError(err)
-				request.CB <- &KeyValue{"status": "error", "error": "hover error"}
+				request.CB <- &KeyValue{"status": "error", "error": request.Method + " error"}
 				continue
 			}
 			request.CB <- &KeyValue{"status": "ok", "result": response}
@@ -166,22 +166,30 @@ func (c *handler) processVueRequests(in mrChan) {
 				c.waitingForDiagnostics = true
 				c.Unlock()
 
-				diagnostics := <-lsc.GetHandler().GetDiagnosticChannel()
-				c.Lock()
-				c.waitingForDiagnostics = false
-				c.Unlock()
+				select {
+				case diagnostics := <-lsc.GetHandler().GetDiagnosticChannel():
+					c.Lock()
+					c.waitingForDiagnostics = false
+					c.Unlock()
 
-				if len(config.MatePath) != 0 {
-					applyTextmateMarks(uuid, diagnostics)
-				} else {
-					request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
+					if len(config.MatePath) != 0 {
+						applyTextmateMarks(uuid, diagnostics)
+					} else {
+						request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
+					}
+				case <-time.After(10 * time.Second):
+					Log("Diagnostics wait timed out")
+					c.Lock()
+					c.waitingForDiagnostics = false
+					c.Unlock()
+					return
 				}
 			}()
 		case "textDocument/didOpen":
 			textDocument := &KeyValue{}
 			if err := json.Unmarshal(request.Body, textDocument); err != nil {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
-				return
+				continue
 			}
 			uri, _ := lsp.NewDocumentURIFromURL(textDocument.string("uri", ""))
 			go lsc.TextDocumentDidOpen(&lsp.DidOpenTextDocumentParams{TextDocument: lsp.TextDocumentItem{
@@ -195,7 +203,7 @@ func (c *handler) processVueRequests(in mrChan) {
 			textDocument := lsp.TextDocumentIdentifier{}
 			if err := json.Unmarshal(request.Body, &textDocument); err != nil {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
-				return
+				continue
 			}
 			go lsc.TextDocumentDidClose(&lsp.DidCloseTextDocumentParams{TextDocument: textDocument})
 			request.CB <- &KeyValue{"status": "ok"}

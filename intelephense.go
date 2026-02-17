@@ -234,6 +234,7 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 				log.Println("respErr: ", respErr)
 				LogError(err)
 				request.CB <- &KeyValue{"status": "error", "error": "initialize error"}
+				cancel()
 				continue
 			}
 			cancel()
@@ -289,7 +290,7 @@ func (c *handler) processIntelephenseRequests(in mrChan) {
 			if respErr != nil || err != nil {
 				log.Println("respErr: ", respErr)
 				LogError(err)
-				request.CB <- &KeyValue{"status": "error", "error": "hover error"}
+				request.CB <- &KeyValue{"status": "error", "error": request.Method + " error"}
 				continue
 			}
 			request.CB <- &KeyValue{"status": "ok", "result": response}

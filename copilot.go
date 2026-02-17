@@ -112,7 +112,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 			// If already signed in, return success
 			if res.Status == "AlreadySignedIn" {
 				request.CB <- &KeyValue{"status": "success", "user": res.User, "message": "Already signed in"}
-				return
+				continue
 			}
 
 			// Return the authentication details for the client to handle
@@ -127,12 +127,12 @@ func (c *handler) processCopilotRequests(in mrChan) {
 			textDocument := &KeyValue{}
 			if err := json.Unmarshal(request.Body, textDocument); err != nil {
 				request.CB <- &KeyValue{"status": "error", "message": err.Error()}
-				return
+				continue
 			}
 			userCode := textDocument.string("userCode", "")
 			if userCode == "" {
 				request.CB <- &KeyValue{"status": "error", "message": "userCode is required"}
-				return
+				continue
 			}
 
 			resp := sendRequest("signInConfirm", KeyValue{"userCode": userCode}, conn, ctx)
@@ -141,7 +141,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 
 			if res.Status == "NotAuthorized" {
 				request.CB <- &KeyValue{"status": "error", "message": "Not authorized"}
-				return
+				continue
 			}
 
 			request.CB <- &KeyValue{"status": "success", "user": res.User}
@@ -152,7 +152,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 
 			if res.Status == "NotAuthorized" {
 				request.CB <- &KeyValue{"status": "error", "message": "Not authorized"}
-				return
+				continue
 			}
 
 			request.CB <- &KeyValue{"status": "success", "user": res.User}
@@ -164,7 +164,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 
 			if res.Status == "NotAuthorized" {
 				request.CB <- &KeyValue{"status": "error", "message": "Not authorized"}
-				return
+				continue
 			}
 
 			request.CB <- &KeyValue{"status": "success", "user": res.User}
@@ -256,7 +256,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 			textDocument := &KeyValue{}
 			if err := json.Unmarshal(request.Body, textDocument); err != nil {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
-				return
+				continue
 			}
 			uri, _ := lsp.NewDocumentURIFromURL(textDocument.string("uri", ""))
 			go lsc.TextDocumentDidOpen(&lsp.DidOpenTextDocumentParams{TextDocument: lsp.TextDocumentItem{
@@ -271,7 +271,7 @@ func (c *handler) processCopilotRequests(in mrChan) {
 			textDocument := lsp.TextDocumentIdentifier{}
 			if err := json.Unmarshal(request.Body, &textDocument); err != nil {
 				request.CB <- &KeyValue{"result": "error", "message": err.Error()}
-				return
+				continue
 			}
 			go lsc.TextDocumentDidClose(&lsp.DidCloseTextDocumentParams{TextDocument: textDocument})
 			request.CB <- &KeyValue{"status": "ok"}

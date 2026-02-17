@@ -116,6 +116,7 @@ func (c *handler) processGoplsRequests(in mrChan) {
 			if respErr != nil || err != nil {
 				log.Println("respErr: ", respErr)
 				LogError(err)
+				cancel()
 				request.CB <- &KeyValue{"status": "error", "error": "initialize error"}
 				continue
 			}
@@ -172,7 +173,7 @@ func (c *handler) processGoplsRequests(in mrChan) {
 			if respErr != nil || err != nil {
 				log.Println("respErr: ", respErr)
 				LogError(err)
-				request.CB <- &KeyValue{"status": "error", "error": "hover error"}
+				request.CB <- &KeyValue{"status": "error", "error": request.Method + " error"}
 				continue
 			}
 			request.CB <- &KeyValue{"status": "ok", "result": response}
@@ -196,15 +197,23 @@ func (c *handler) processGoplsRequests(in mrChan) {
 				c.waitingForDiagnostics = true
 				c.Unlock()
 
-				diagnostics := <-lsc.GetHandler().GetDiagnosticChannel()
-				c.Lock()
-				c.waitingForDiagnostics = false
-				c.Unlock()
+				select {
+				case diagnostics := <-lsc.GetHandler().GetDiagnosticChannel():
+					c.Lock()
+					c.waitingForDiagnostics = false
+					c.Unlock()
 
-				if len(config.MatePath) != 0 {
-					applyTextmateMarks(uuid, diagnostics)
-				} else {
-					request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
+					if len(config.MatePath) != 0 {
+						applyTextmateMarks(uuid, diagnostics)
+					} else {
+						request.CB <- &KeyValue{"status": "ok", "result": diagnostics.Diagnostics}
+					}
+				case <-time.After(10 * time.Second):
+					Log("Timed out waiting for diagnostics")
+					c.Lock()
+					c.waitingForDiagnostics = false
+					c.Unlock()
+					return
 				}
 			}()
 		case "textDocument/didOpen":
