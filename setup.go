@@ -14,35 +14,22 @@ import (
 	"golang.org/x/term"
 )
 
-// needsSetup checks if config.json exists using the same search logic as readConfig.
+// needsSetup checks if config.json exists at the expected location.
 func needsSetup(configPath string) bool {
 	if len(configPath) > 0 {
 		_, err := os.Stat(configPath)
 		return os.IsNotExist(err)
 	}
 
-	// Check current directory
-	if _, err := os.Stat("config.json"); err == nil {
-		return false
-	}
-
-	// Check executable's directory
-	exePath, err := os.Executable()
-	if err == nil {
-		altPath := filepath.Join(filepath.Dir(exePath), "config.json")
-		if _, err := os.Stat(altPath); err == nil {
-			return false
-		}
-	}
-
-	return true
+	_, err := os.Stat(configFilePath())
+	return os.IsNotExist(err)
 }
 
 // runSetup runs the first-run configuration wizard.
 func runSetup() (*Config, error) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		fmt.Fprintln(os.Stderr, "No config.json found and no TTY available.")
-		fmt.Fprintln(os.Stderr, "Create a config.json manually (see config.json.default) or run interactively.")
+		fmt.Fprintf(os.Stderr, "No config found at %s and no TTY available.\n", configFilePath())
+		fmt.Fprintln(os.Stderr, "Create the config manually (see config.json.default) or run interactively.")
 		return nil, fmt.Errorf("no TTY for setup wizard")
 	}
 
@@ -463,17 +450,12 @@ func writeConfig(cfg Config) error {
 		return err
 	}
 
-	configPath := "config.json"
-	if exePath, err := os.Executable(); err == nil {
-		candidate := filepath.Join(filepath.Dir(exePath), "config.json")
-		if f, err := os.Create(candidate); err == nil {
-			f.Close()
-			os.Remove(candidate)
-			configPath = candidate
-		}
+	dir := configDir()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("creating config directory %s: %w", dir, err)
 	}
 
-	return os.WriteFile(configPath, data, 0644)
+	return os.WriteFile(configFilePath(), data, 0644)
 }
 
 // --- view ---
@@ -500,7 +482,7 @@ func (m setupModel) View() string {
 
 func (m setupModel) viewWelcome() string {
 	s := titleStyle.Render("lsp-client Setup") + "\n\n"
-	s += "No config.json found. Let's set up lsp-client.\n\n"
+	s += fmt.Sprintf("No config found at %s\nLet's set up lsp-client.\n\n", configFilePath())
 	s += subtleStyle.Render("Press Enter to continue...")
 	return s
 }
@@ -642,12 +624,12 @@ func (m setupModel) viewSummary() string {
 	s += fmt.Sprintf("  Port: %s\n", m.config.Port)
 	s += fmt.Sprintf("  Logging: %v\n", m.config.EnableLogging)
 
-	s += "\n" + subtleStyle.Render("y/Enter: write config.json  |  n: cancel")
+	s += "\n" + subtleStyle.Render(fmt.Sprintf("y/Enter: write to %s  |  n: cancel", configFilePath()))
 	return s
 }
 
 func (m setupModel) viewDone() string {
-	s := checkedStyle.Render("config.json written successfully!") + "\n"
+	s := checkedStyle.Render(fmt.Sprintf("Config written to %s", configFilePath())) + "\n"
 	s += "Starting lsp-client...\n"
 	return s
 }

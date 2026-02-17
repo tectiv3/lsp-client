@@ -46,22 +46,21 @@ func catchAndLogPanic(callback func()) {
 	}
 }
 
+func configDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic("cannot determine home directory: " + err.Error())
+	}
+	return filepath.Join(home, ".config", "lsp-client")
+}
+
+func configFilePath() string {
+	return filepath.Join(configDir(), "config.json")
+}
+
 func readConfig(configPath string) {
 	if len(configPath) == 0 {
-		configPath = "config.json"
-
-		// If config.json doesn't exist in current directory,
-		// try to find it in the executable's directory
-		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			exePath, err := os.Executable()
-			if err == nil {
-				exeDir := filepath.Dir(exePath)
-				altPath := filepath.Join(exeDir, "config.json")
-				if _, err := os.Stat(altPath); err == nil {
-					configPath = altPath
-				}
-			}
-		}
+		configPath = configFilePath()
 	}
 
 	f, err := os.Open(configPath)
