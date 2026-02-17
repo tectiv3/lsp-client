@@ -23,7 +23,9 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:deepwiki.com)",
       "mcp__serena__replace_symbol_body",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "mcp__serena__edit_memory",
+      "Bash(go mod tidy:*)"
     ],
     "deny": [],
     "ask": []

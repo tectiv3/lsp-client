@@ -12,12 +12,20 @@ var config Config
 var menuBarApp *MenuBarApp
 
 func main() {
-	// check for first argument, if it is present - use it as config path
+	var configPath string
 	if len(os.Args) > 1 {
-		configPath := os.Args[1]
-		readConfig(configPath)
+		configPath = os.Args[1]
+	}
+
+	if needsSetup(configPath) {
+		cfg, err := runSetup()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Setup failed: %v\n", err)
+			os.Exit(1)
+		}
+		config = *cfg
 	} else {
-		readConfig("")
+		readConfig(configPath)
 	}
 
 	startCopilotTokenMaintenance()

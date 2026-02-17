@@ -66,6 +66,10 @@ func readConfig(configPath string) {
 
 	f, err := os.Open(configPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			Log("Config file not found: %s", configPath)
+			return
+		}
 		panic(err)
 	}
 	defer f.Close()

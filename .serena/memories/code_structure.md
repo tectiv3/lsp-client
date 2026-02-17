@@ -47,9 +47,9 @@
   - `startGopls`: Initializes Gopls
   - `processGoplsRequests`: Handles Go LSP requests
 
-- **`volar.go`**: Vue language server
-  - `startVolar`: Initializes Volar
-  - `processVolarRequests`: Handles Vue LSP requests
+- **`vue.go`**: Vue language server (@vue/language-server)
+  - `startVue`: Initializes Vue LS with --tsdk CLI arg and hybridMode option
+  - `processVueRequests`: Handles Vue LSP requests
 
 ### Supporting Files
 - **`auth.go`**: Authentication logic and terminal flow
@@ -72,7 +72,8 @@
 ├── copilot.go           # Copilot client
 ├── intelephense.go      # PHP client
 ├── gopls.go             # Go client
-├── volar.go             # Vue client
+├── vue.go               # Vue client
+├── setup.go             # First-run config wizard (bubbletea TUI)
 ├── auth.go              # Authentication
 ├── logger.go            # Logging
 ├── utils.go             # Utilities
