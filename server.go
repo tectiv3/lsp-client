@@ -93,7 +93,7 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 		} else if languageId == "go" {
 			result = s.sendLSPRequest(s.gopls, "textDocument/hover", params)
 		} else {
-			result = s.sendLSPRequest(s.volar, "textDocument/hover", params)
+			result = s.sendLSPRequest(s.vue, "textDocument/hover", params)
 		}
 
 		cb <- result
@@ -116,7 +116,7 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 		} else if languageId == "go" {
 			result = s.sendLSPRequest(s.gopls, "textDocument/completion", params)
 		} else if languageId == "javascript" || languageId == "typescript" || languageId == "vue" {
-			result = s.sendLSPRequest(s.volar, "textDocument/completion", params)
+			result = s.sendLSPRequest(s.vue, "textDocument/completion", params)
 		}
 		if config.EnableLogging {
 			Log("Sending completion response")
@@ -141,7 +141,7 @@ func (s *mateServer) processRequest(mr mateRequest, cb kvChan) {
 		} else if languageId == "go" {
 			result = s.sendLSPRequest(s.gopls, "textDocument/definition", params)
 		} else {
-			result = s.sendLSPRequest(s.volar, "textDocument/definition", params)
+			result = s.sendLSPRequest(s.vue, "textDocument/definition", params)
 		}
 		if config.EnableLogging {
 			Log("Sending definition response")
@@ -252,7 +252,7 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 				s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
 					"uri": k,
 				})
-				s.sendLSPRequest(s.volar, "textDocument/didClose", KeyValue{
+				s.sendLSPRequest(s.vue, "textDocument/didClose", KeyValue{
 					"uri": k,
 				})
 				s.sendLSPRequest(s.copilot, "textDocument/didClose", KeyValue{
@@ -266,7 +266,7 @@ func (s *mateServer) onDidOpen(mr mateRequest, cb kvChan) {
 
 	var ch mrChan
 	if languageId == "vue" || languageId == "js" || languageId == "ts" || languageId == "tsx" {
-		ch = s.volar
+		ch = s.vue
 	} else if languageId == "php" {
 		ch = s.intelephense
 	} else if languageId == "go" {
@@ -307,7 +307,7 @@ func (s *mateServer) onDidClose(mr mateRequest, cb kvChan) {
 	go s.sendLSPRequest(s.intelephense, "textDocument/didClose", KeyValue{
 		"uri": fn,
 	})
-	go s.sendLSPRequest(s.volar, "textDocument/didClose", KeyValue{
+	go s.sendLSPRequest(s.vue, "textDocument/didClose", KeyValue{
 		"uri": fn,
 	})
 	go s.sendLSPRequest(s.copilot, "textDocument/didClose", KeyValue{
@@ -351,7 +351,7 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 	if !s.initialized {
 		// initialize intelephense
 		s.sendLSPRequest(s.intelephense, "initialize", params)
-		s.sendLSPRequest(s.volar, "initialize", params)
+		s.sendLSPRequest(s.vue, "initialize", params)
 		s.sendLSPRequest(s.gopls, "initialize", params)
 		s.initialized = true
 		s.openFolders[name] = lsp.NewDocumentURI(dir)
@@ -366,7 +366,7 @@ func (s *mateServer) onInitialize(mr mateRequest, cb kvChan) {
 		// for f, v := range s.openFolders {
 		//     params["folders"] = append(params["folders"].([]KeyValue), KeyValue{"uri": v, "name": f})
 		// }
-		s.sendLSPRequest(s.volar, "initialize", params)
+		s.sendLSPRequest(s.vue, "initialize", params)
 		s.sendLSPRequest(s.gopls, "initialize", params)
 	}
 
@@ -396,11 +396,11 @@ func (s *mateServer) handlePanic(mr mateRequest) {
 	}
 }
 
-func startServer(intelephense, copilot, volar, gopls mrChan, port string) {
+func startServer(intelephense, copilot, vue, gopls mrChan, port string) {
 	Log("Running webserver on port: %s", port)
 	server = mateServer{
 		intelephense: intelephense,
-		volar:        volar,
+		vue:          vue,
 		copilot:      copilot,
 		gopls:        gopls,
 		initialized:  false,

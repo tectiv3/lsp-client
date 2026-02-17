@@ -17,7 +17,13 @@
       "mcp__serena__insert_after_symbol",
       "Bash(go build:*)",
       "Bash(go vet:*)",
-      "Bash(make app:*)"
+      "Bash(make app:*)",
+      "mcp__serena__list_memories",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "mcp__serena__replace_symbol_body",
+      "Bash(git mv:*)"
     ],
     "deny": [],
     "ask": []

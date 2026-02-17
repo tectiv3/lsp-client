@@ -16,7 +16,7 @@ import (
 type Config struct {
 	NodePath            string `json:"node_path"`
 	CopilotPath         string `json:"copilot_path"`
-	VolarPath           string `json:"volar_path"`
+	VueLSPath           string `json:"vue_ls_path"`
 	GoplsPath           string `json:"gopls_path"`
 	IntelephensePath    string `json:"intelephense_path"`
 	IntelephenseLicense string `json:"intelephense_license"`
@@ -164,7 +164,7 @@ type mateRequest struct {
 type mateServer struct {
 	copilot      mrChan
 	intelephense mrChan
-	volar        mrChan
+	vue          mrChan
 	gopls        mrChan
 	initialized  bool
 	logger       jsonrpc.Logger
@@ -275,7 +275,7 @@ type AppStatus struct {
 	CopilotStatus      ServerStatus
 	IntelephenseStatus ServerStatus
 	GoplsStatus        ServerStatus
-	VolarStatus        ServerStatus
+	VueStatus          ServerStatus
 	HTTPServerStatus   ServerStatus
 	HTTPPort           string
 	Auth               AuthStatus

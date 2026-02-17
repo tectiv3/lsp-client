@@ -50,14 +50,14 @@ func main() {
 	}
 
 	// start vue LS
-	volarChan := make(mrChan, 2)
-	go startVolar(volarChan)
-	if len(config.VolarPath) > 0 {
-		startedServers = append(startedServers, "Volar")
+	vueChan := make(mrChan, 2)
+	go startVue(vueChan)
+	if len(config.VueLSPath) > 0 {
+		startedServers = append(startedServers, "Vue")
 	}
 
 	// start webserver
-	go startServer(intelephenseChan, copilotChan, volarChan, goplsChan, config.Port)
+	go startServer(intelephenseChan, copilotChan, vueChan, goplsChan, config.Port)
 	if config.Port != "" {
 		startedServers = append(startedServers, fmt.Sprintf("HTTP Server (:%s)", config.Port))
 	} else {

@@ -1,7 +1,7 @@
 {
   "node_path": "/opt/homebrew/opt/node@16/bin/node",
   "copilot_path": "/opt/homebrew/bin/copilot-node-server",
-  "volar_path": "/opt/homebrew/bin/vue-language-server",
+  "vue_ls_path": "/opt/homebrew/bin/vue-language-server",
   "intelephense_path": "/opt/homebrew/bin/intelephense",
   "intelephense_license": "",
   "intelephense_storage": "/tmp/intelephense",

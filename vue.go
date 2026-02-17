@@ -11,11 +11,11 @@ import (
 	"go.bug.st/json"
 )
 
-var vClient *handler
+var vueClient *handler
 
-func startVolar(in mrChan) {
-	if len(config.VolarPath) == 0 {
-		Log("Volar path not set")
+func startVue(in mrChan) {
+	if len(config.VueLSPath) == 0 {
+		Log("Vue LS path not set")
 		go func() {
 			for {
 				request := <-in
@@ -24,151 +24,25 @@ func startVolar(in mrChan) {
 		}()
 		return
 	}
-	vClient = startRPCServer("volar", config.NodePath, config.VolarPath, "--stdio")
-	vClient.Requests = make(map[string]string)
-	vClient.SetConfig(KeyValue{
-		"files": KeyValue{
-			"maxSize":      300000,
-			"associations": []string{"*.vue", "*.js"},
-			"exclude": []string{
-				"**/.git/**",
-				"**/.svn/**",
-				"**/.hg/**",
-				"**/CVS/**",
-				"**/.DS_Store/**",
-				"**/node_modules/**",
-				"**/bower_components/**",
-				"**/vendor/**/{Test,test,Tests,tests}/**",
-				"**/.git",
-				"**/.svn",
-				"**/.hg",
-				"**/CVS",
-				"**/.DS_Store",
-				"**/nova/tests/**",
-				"**/faker/**",
-				"**/*.log",
-				"**/*.log*",
-				"**/*.min.*",
-				"**/dist",
-				"**/coverage",
-				"**/build/*",
-				"**/nova/public/*",
-				"**/public/*",
-			},
-		},
-		"stubs": []string{
-			"apache",
-			"bcmath",
-			"bz2",
-			"calendar",
-			"com_dotnet",
-			"Core",
-			"ctype",
-			"curl",
-			"date",
-			"dba",
-			"dom",
-			"enchant",
-			"exif",
-			"fileinfo",
-			"filter",
-			"fpm",
-			"ftp",
-			"gd",
-			"hash",
-			"iconv",
-			"imap",
-			"interbase",
-			"intl",
-			"json",
-			"ldap",
-			"libxml",
-			"mbstring",
-			"mcrypt",
-			"meta",
-			"mssql",
-			"mysqli",
-			"oci8",
-			"odbc",
-			"openssl",
-			"pcntl",
-			"pcre",
-			"PDO",
-			"pdo_ibm",
-			"pdo_mysql",
-			"pdo_pgsql",
-			"pdo_sqlite",
-			"pgsql",
-			"Phar",
-			"posix",
-			"pspell",
-			"readline",
-			"recode",
-			"Reflection",
-			"regex",
-			"session",
-			"shmop",
-			"SimpleXML",
-			"snmp",
-			"soap",
-			"sockets",
-			"sodium",
-			"SPL",
-			"sqlite3",
-			"standard",
-			"superglobals",
-			"sybase",
-			"sysvmsg",
-			"sysvsem",
-			"sysvshm",
-			"tidy",
-			"tokenizer",
-			"wddx",
-			"xml",
-			"xmlreader",
-			"xmlrpc",
-			"xmlwriter",
-			"Zend OPcache",
-			"zip",
-			"zlib",
-		},
-		"completion": KeyValue{
-			"insertUseDeclaration":                    true,
-			"fullyQualifyGlobalConstantsAndFunctions": false,
-			"triggerParameterHints":                   true,
-			"maxItems":                                100,
-		},
-		"format": KeyValue{
-			"enable": false,
-		},
-		"environment": KeyValue{
-			"documentRoot": "",
-			"includePaths": []string{},
-		},
-		"runtime":   "",
-		"maxMemory": 0,
-		"telemetry": KeyValue{"enabled": false},
-		"trace": KeyValue{
-			"server": "verbose",
-		},
-	})
-	vClient.lsc.SetLogger(&Logger{
-		IncomingPrefix: "LSV <-- Volar", OutgoingPrefix: "LSV --> Volar",
+	vueClient = startRPCServer("vue", config.NodePath, config.VueLSPath, "--stdio", "--tsdk="+config.TsdkPath)
+	vueClient.Requests = make(map[string]string)
+	vueClient.lsc.SetLogger(&Logger{
+		IncomingPrefix: "LSV <-- Vue", OutgoingPrefix: "LSV --> Vue",
 		HiColor: hiBlueString, LoColor: blueString, ErrorColor: errorString,
 	})
-	vClient.lsc.RegisterCustomNotification("indexingStarted", func(jsonrpc.FunctionLogger, json.RawMessage) {})
-	vClient.lsc.RegisterCustomNotification("indexingEnded", func(jsonrpc.FunctionLogger, json.RawMessage) {})
+	vueClient.lsc.RegisterCustomNotification("indexingStarted", func(jsonrpc.FunctionLogger, json.RawMessage) {})
+	vueClient.lsc.RegisterCustomNotification("indexingEnded", func(jsonrpc.FunctionLogger, json.RawMessage) {})
 
-	go vClient.lsc.Run()
-	go vClient.processVolarRequests(in)
+	go vueClient.lsc.Run()
+	go vueClient.processVueRequests(in)
 }
 
-func (c *handler) processVolarRequests(in mrChan) {
+func (c *handler) processVueRequests(in mrChan) {
 	defer catchAndLogPanic(func() {
-		c.processVolarRequests(in)
+		c.processVueRequests(in)
 	})
 
-	Log("Volar is waiting for input")
+	Log("Vue LS is waiting for input")
 	ctx := context.Background()
 	lsc := c.lsc
 
@@ -215,14 +89,8 @@ func (c *handler) processVolarRequests(in mrChan) {
 			ctxC, cancel := context.WithTimeout(ctx, time.Second)
 			_, respErr, err := lsc.Initialize(ctxC, &lsp.InitializeParams{
 				ProcessID: &pid,
-				//RootURI:   lsp.NewDocumentURI(dir),
-				//RootPath:  dir,
 				InitializationOptions: lsp.KeyValue{
-					"clearCache": true, "isVscode": true,
-					"syntaxes": []string{"vue"},
-					"typescript": lsp.KeyValue{
-						"tsdk": config.TsdkPath,
-					},
+					"vue": lsp.KeyValue{"hybridMode": false},
 				},
 				Capabilities: lsp.KeyValue{
 					"workspace":        KeyValue{"workspaceFolders": true},
@@ -248,7 +116,6 @@ func (c *handler) processVolarRequests(in mrChan) {
 				continue
 			}
 			response, respErr, err := lsc.TextDocumentHover(ctx, &lsp.HoverParams{TextDocumentPositionParams: params})
-			//response, respErr, err := lsc.GetConnection().SendRequest(ctx, "textDocument/hover", request.Body)
 			if respErr != nil || err != nil {
 				log.Println("respErr: ", respErr)
 				LogError(err)
@@ -268,17 +135,6 @@ func (c *handler) processVolarRequests(in mrChan) {
 					Removed: []lsp.WorkspaceFolder{},
 				},
 			})
-			//lsc.GetConnection().SendNotification("workspace/didChangeWorkspaceFolders", lsp.EncodeMessage(KeyValue{
-			//	"event": KeyValue{
-			//		"added": []KeyValue{
-			//			KeyValue{
-			//				"uri":  folder.URI,
-			//				"name": folder.Name,
-			//			},
-			//		},
-			//		"removed": []KeyValue{},
-			//	},
-			//}))
 		case "textDocument/definition":
 			fallthrough
 		case "textDocument/completion":
